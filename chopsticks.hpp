@@ -212,11 +212,20 @@ string Player::get_status() {
     string result = "P" + to_string(player_number) + type[0] + " (";
     for (auto &hand : hands) {
         result += hand.get_status();
+        result += "/" + to_string(hand.get_max_count()) + " ";
     }
-    result += ":";
+
+    if (hands.size() != 0) result.pop_back(); //for dogs with no hands
+    else result += "0";
+
+    result += " : ";
     for (auto &foot : feet) {
         result += foot.get_status();
+        result += "/" + to_string(foot.get_max_count()) + " ";
     }
+
+    if (feet.size() != 0) result.pop_back(); //for zombies with no feet
+    else result += "0";
     result += ")";
     if (skip) result += " [skipping]";
     return result;
