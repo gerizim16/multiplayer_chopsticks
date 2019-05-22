@@ -20,7 +20,7 @@ class Extremity {
         : max_count(max_count), type(type), alive(true), count(1) {}
     string get_type() { return type; }
     bool const is_alive() { return alive; }
-    char const get_status() { return alive ? '0' + count : 'X'; }
+    string const get_status() { return alive ? to_string(count) + "/" + to_string(max_count) : "X"; }
     int const get_count() { return count; }
     int const get_max_count() { return max_count; }
     bool tap(Extremity &other);
@@ -212,9 +212,11 @@ string Player::get_status() {
     string result = "P" + to_string(player_number) + type[0] + " (";
     for (auto &hand : hands) {
         result += hand.get_status();
+        result += " ";
     }
     result += ":";
     for (auto &foot : feet) {
+        result += " ";
         result += foot.get_status();
     }
     result += ")";
@@ -385,7 +387,7 @@ bool Team::play_with(vector<Player *> &all_players) {
         return false;
     }
     int player_index = current_player->get_player_number() - 1;
-    outputToAll(outputs, "Waiting for player " + to_string(player_index+1) + ".", outputs[player_index]);
+    outputToAll(outputs, "Waiting for player " + to_string(player_index + 1) + ".", outputs[player_index]);
     vector<string> actions_made = current_player->play_with(all_players);
     outputToAll(outputs, "Player " + to_string(player_index + 1) + " actions:", outputs[player_index]);
     for (auto &&action : actions_made) {
@@ -444,6 +446,6 @@ string Team::get_status() {
         result += players[i]->get_status();
         result += " | ";
     }
-    result.erase(result.end()-3, result.end());
+    result.erase(result.end() - 3, result.end());
     return result;
 }
