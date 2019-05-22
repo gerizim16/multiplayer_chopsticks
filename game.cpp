@@ -157,7 +157,6 @@ void runServer(string port) {
     int current_team_index = 0;
     Team *winning_team = nullptr;
     // output initial game status
-    //cerr << teams.size();
     for (Team &team : teams) {
         outputToAll(outputs, team.get_status());
     }

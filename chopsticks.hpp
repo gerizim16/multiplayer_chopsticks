@@ -103,7 +103,7 @@ class Player {
     bool const is_alive() { return alive; }
     bool attack(Player &other, string my_stats, string other_stats);
     bool distribute(string mode, vector<int> change);
-    virtual void skip_turn(bool force = false);
+    virtual void skip_turn(bool force = false) { skip = true; }
     bool check_skip(bool modify_skip = false);
     bool const get_skip() { return skip; }
     string get_status();
@@ -169,8 +169,6 @@ bool Player::distribute(string mode, vector<int> change) {
     }
     return true;
 }
-
-void Player::skip_turn(bool force) { skip = true; }
 
 /**
  * @param if set to true, modifies skip status. default: false
