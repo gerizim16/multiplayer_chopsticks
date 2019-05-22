@@ -39,8 +39,9 @@ bool Extremity::tap(Extremity &other) {
     return true;
 }
 
-/* @return true if new count is in bounds else false */
+/* @return true if new count is in bounds and alive else false */
 bool Extremity::set_count(int new_count) {
+    if (!alive) return false;
     if (0 <= new_count && new_count < max_count) {
         count = new_count;
         return true;
@@ -102,8 +103,22 @@ class Player {
     int const get_player_number() { return player_number; }
     void set_team_number(int new_team_number) { team_number = new_team_number; }
     int const get_team_number() { return team_number; }
-    int const get_hands_count() { return hands.size(); }
-    int const get_feet_count() { return feet.size(); }
+    int const get_hands_count(bool only_alive = false) {
+        if (!only_alive) return hands.size();
+        int count = 0;
+        for (auto &hand : hands) {
+            if (hand.is_alive()) ++count;
+        }
+        return count;
+    }
+    int const get_feet_count(bool only_alive = false) {
+        if (!only_alive) return feet.size();
+        int count = 0;
+        for (auto &foot : feet) {
+            if (foot.is_alive()) ++count;
+        }
+        return count;
+    }
     bool const is_alive() { return alive; }
     bool attack(Player &other, string my_stats, string other_stats);
     bool distribute(string mode, vector<int> change);
@@ -117,7 +132,7 @@ class Player {
 Player::Player(string type, int player_number, int hand_count, int foot_count,
                int finger_count, int toe_count, ostream *output, istream *input,
                int turns)
-    : type(type), player_number(player_number), skip(false), alive(true), max_fingers(finger_count), max_toes(toe_count) , output(output), input(input), turns(turns) {
+    : type(type), player_number(player_number), skip(false), alive(true), max_fingers(finger_count), max_toes(toe_count), output(output), input(input), turns(turns) {
     for (int i = 0; i < hand_count; ++i) {
         Hand temp_hand(finger_count);
         hands.push_back(temp_hand);
@@ -156,22 +171,35 @@ bool Player::distribute(string mode, vector<int> change) {
         return false;
     }
     if (extr.size() != change.size()) return false;
+    // check if original sum and new sum are equal
     int change_sum = 0, extremeties_sum = 0;
     for (size_t i = 0; i < extr.size(); ++i) {
         int temp_change = change[i];
         if (extr[i]->is_alive()) {
-            if (!(1 <= temp_change && temp_change < extr[i]->get_max_count())) return false;
+            if (!(1 <= temp_change && temp_change < extr[i]->get_max_count())) {
+                outputTo(output, "Distribution out of valid bounds.");
+                return false;
+            }
         } else {
             continue;
         }
         change_sum += temp_change;
         extremeties_sum += extr[i]->get_count();
     }
-    if (change_sum != extremeties_sum) return false;
-    for (size_t i = 0; i < extr.size(); ++i) {
-        extr[i]->set_count(change[i]);
+    if (change_sum != extremeties_sum) {
+        outputTo(output, "Distribution sum are not equal.");
+        return false;
     }
-    return true;
+    // modify
+    bool changed = false;
+    for (size_t i = 0; i < extr.size(); ++i) {
+        if (extr[i]->is_alive()) {
+            if (change[i] != extr[i]->get_count()) changed = true;
+            extr[i]->set_count(change[i]);
+        }
+    }
+    if (!changed) outputTo(output, "No change in distribution.");
+    return changed;
 }
 
 /**
@@ -226,8 +254,10 @@ string Player::get_status() {
         result += foot.get_status();
     }
     result += ") [" + to_string(max_fingers) + ":" + to_string(max_toes) + "]";
-    if (!alive) result += " [dead]";
-    else if (skip) result += " [skipping]";
+    if (!alive)
+        result += " [dead]";
+    else if (skip)
+        result += " [skipping]";
     return result;
 }
 
@@ -273,23 +303,22 @@ vector<string> Player::play_with(vector<Player *> &all_players) {
                 --i;
                 continue;
             }
-        } else if (action == "disthands") {
-            vector<int> changes(get_hands_count());
-            for (auto &item : changes) {
-                line >> item;
-            }
-            if (!distribute("hands", changes)) {
-                outputTo(output, "Invalid distribution! Enter action again.");
+        } else if (action == "disthands" || action == "distfeet") {
+            vector<int> changes(action == "disthands" ? get_hands_count() : get_feet_count());
+            if ((action == "disthands" ? get_hands_count(true) : get_feet_count(true)) <= 1) {
+                outputTo(output, "Unable to redistribute.");
                 --i;
                 continue;
             }
-        } else if (action == "distfeet") {
-            vector<int> changes(get_feet_count());
-            for (auto &item : changes) {
-                line >> item;
+            for (size_t i = 0; i < changes.size(); ++i) {
+                if (action == "disthands" && hands[i].is_alive()) {
+                    line >> changes[i];
+                } else if (feet[i].is_alive()) {
+                    line >> changes[i];
+                }
             }
-            if (!distribute("feet", changes)) {
-                outputTo(output, "Invalid distribution! Enter action again.");
+            if (!distribute(action == "disthands" ? "hands" : "feet", changes)) {
+                // outputTo(output, "Invalid distribution! Enter action again.");
                 --i;
                 continue;
             }
@@ -468,8 +497,10 @@ string Team::get_status() {
         result += " | ";
     }
 
-    if (!is_alive()) result += "Team is dead.";
-    else if (next == nullptr) result += "Team will be skipped.";
+    if (!is_alive())
+        result += "Team is dead.";
+    else if (next == nullptr)
+        result += "Team will be skipped.";
     return result;
 }
 
