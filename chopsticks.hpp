@@ -103,6 +103,7 @@ class Player {
     bool distribute(string mode, vector<int> change);
     virtual void skip_turn(bool force = false);
     bool check_skip();
+    bool look_for_skip();
     string get_status();
     vector<string> play_with(vector<Player *> &all_players);
 };
@@ -179,6 +180,14 @@ bool Player::check_skip() {
     }
 }
 
+bool Player::look_for_skip() {
+    if (skip) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
 void Player::attacked_by(Player &other, Extremity &other_ex,
                          Extremity &my_ex) {
     alive = false;
@@ -222,7 +231,8 @@ string Player::get_status() {
     }
     if (feet.size() == 0) result += " 0";  // for zombies with no feet
     result += ")";
-    if (skip) result += " [skipping]";
+    if (!is_alive()) result += " [dead]";
+    else if (skip) result += " [skipping]";
     return result;
 }
 
@@ -341,11 +351,15 @@ class Doggo : public Player {
 class Team {
    private:
     int team_number;
+    bool first_turn = true;
     vector<ostream *> outputs;
     vector<Player *> players;
     int current_player_index;
+    int next_player_index;
     Player *current_player;
+    Player *next_player;
     bool get_next_available_player();
+    Player* check_for_next_player();
 
    public:
     Team(int team_number, vector<ostream *> outputs = {});
@@ -357,7 +371,7 @@ class Team {
     string get_status();
 };
 
-Team::Team(int team_number, vector<ostream *> outputs) : team_number(team_number), outputs(outputs), current_player_index(0), current_player(nullptr) {
+Team::Team(int team_number, vector<ostream *> outputs) : team_number(team_number), outputs(outputs), current_player_index(0), next_player_index(0), current_player(nullptr), next_player(nullptr) {
 }
 
 bool Team::is_alive() {
@@ -384,12 +398,14 @@ bool Team::play_with(vector<Player *> &all_players) {
     if (!is_alive()) {
         return false;
     }
+
     if (!get_next_available_player()) {
         outputToAll(outputs, "Team " + to_string(team_number) + " has been skipped.");
         return false;
     }
     int player_index = current_player->get_player_number() - 1;
-    outputToAll(outputs, "Waiting for player " + to_string(player_index+1) + ".", outputs[player_index]);
+    cout << player_index << endl;
+    outputToAll(outputs, "Waiting for player " + to_string(player_index+1) + " from team " + to_string(team_number) + ".", outputs[player_index]);
     vector<string> actions_made = current_player->play_with(all_players);
     outputToAll(outputs, "Player " + to_string(player_index + 1) + " actions:", outputs[player_index]);
     for (auto &&action : actions_made) {
@@ -402,9 +418,47 @@ void Team::add_player(Player *new_player) {
     players.push_back(new_player);
 }
 
+//function just checks for the next player
+Player* Team::check_for_next_player(){
+    if (next_player == nullptr){
+        next_player = players[0];
+        return next_player;
+    }
+
+    int fallback_index = next_player_index;
+    int players_skipped = 0;
+
+    // start checking with next player
+    next_player_index = (next_player_index + 1) % players.size();
+    next_player = players[next_player_index];
+    // keep track last player who was checked
+    Player *first_player_checked = next_player;
+
+    do {
+        if (next_player->is_alive()) {
+            if (next_player->look_for_skip()) {
+                ++players_skipped;
+            } else {
+                break;
+            }
+        }
+        // current player can't play so move to next
+        next_player_index = (next_player_index + 1) % players.size();
+        next_player = players[next_player_index];
+    } while (next_player != first_player_checked);
+
+    if (players_skipped == get_players_alive_count()) {  // all alive players skip turns
+        next_player_index = fallback_index;
+        next_player = players[next_player_index];
+        return nullptr;  // no available player in team to play
+    }
+    return next_player;
+
+}
 /* @return true if there is a next available player else false */
+//function moves the actual next player
 bool Team::get_next_available_player() {
-    // if first turn
+    //if first turn
     if (current_player == nullptr) {
         current_player = players[0];
         return true;
@@ -448,6 +502,10 @@ string Team::get_status() {
         result += players[i]->get_status();
         result += " | ";
     }
-    result.erase(result.end()-3, result.end());
+
+    Player* next = check_for_next_player();
+    if (next != nullptr) result += "Next player to act: Player " + to_string(next_player->get_player_number());
+    else if (!is_alive()) result += "Team is dead.";
+    else result += "Team will be skipped.";
     return result;
 }
