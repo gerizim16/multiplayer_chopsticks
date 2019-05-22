@@ -94,6 +94,7 @@ class Player {
            int foot_count, int finger_count, int toe_count, int turns = 1);
     virtual ~Player() {}
     string get_type() { return type; }
+    void set_team_number(int new_team_number) { team_number = new_team_number; }
     int const get_team_number() { return team_number; }
     int const get_hands_count() { return hands.size(); }
     int const get_feet_count() { return feet.size(); }
@@ -321,7 +322,7 @@ class Team {
    private:
     int team_number;
     vector<Player *> players;
-    int index;
+    int current_player_index;
     Player *current_player;
     bool get_next_available_player();
 
@@ -335,7 +336,7 @@ class Team {
     string get_status();
 };
 
-Team::Team(int team_number) : team_number(team_number), index(0), current_player(nullptr) {
+Team::Team(int team_number) : team_number(team_number), current_player_index(0), current_player(nullptr) {
 }
 
 bool Team::is_alive() {
@@ -381,12 +382,12 @@ bool Team::get_next_available_player() {
         return true;
     }
 
-    int fallback_index = index;
+    int fallback_index = current_player_index;
 
     int players_skipped = 0;
     // start checking with next player
-    index = (index + 1) % players.size();
-    current_player = players[index];
+    current_player_index = (current_player_index + 1) % players.size();
+    current_player = players[current_player_index];
     // keep track last player who was checked
     Player *first_player_checked = current_player;
 
@@ -400,13 +401,13 @@ bool Team::get_next_available_player() {
             }
         }
         // current player can't play so move to next
-        index = (index + 1) % players.size();
-        current_player = players[index];
+        current_player_index = (current_player_index + 1) % players.size();
+        current_player = players[current_player_index];
     } while (current_player != first_player_checked);
 
     if (players_skipped == get_players_alive_count()) {  // all alive players skip turns
-        index = fallback_index;
-        current_player = players[index];
+        current_player_index = fallback_index;
+        current_player = players[current_player_index];
         return false;  // no available player in team to play
     }
     return true;
