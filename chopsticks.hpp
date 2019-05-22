@@ -3,13 +3,9 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include "functions.hpp"
 
 using namespace std;
-
-void iclear_buffer(istream *input = &cin) {
-    input->clear();
-    input->ignore(numeric_limits<streamsize>::max(), '\n');
-}
 
 class Extremity {
    protected:
@@ -83,6 +79,8 @@ class Player {
     bool alive;
     vector<Hand> hands;
     vector<Foot> feet;
+    ostream *output;
+    istream *input;
     int turns;
     Extremity *get_ex(string mode);
 
@@ -90,10 +88,12 @@ class Player {
     virtual void attacked_by(Player &other, Extremity &other_ex, Extremity &my_ex);
 
    public:
-    Player(string type, int player_number, int hand_count,
-           int foot_count, int finger_count, int toe_count, int turns = 1);
+    Player(string type, int player_number, int hand_count, int foot_count,
+           int finger_count, int toe_count, ostream *output = &cout, istream *input = &cin,
+           int turns = 1);
     virtual ~Player() {}
     string get_type() { return type; }
+    int const get_player_number() { return player_number; }
     void set_team_number(int new_team_number) { team_number = new_team_number; }
     int const get_team_number() { return team_number; }
     int const get_hands_count() { return hands.size(); }
@@ -104,12 +104,13 @@ class Player {
     virtual void skip_turn(bool force = false);
     bool check_skip();
     string get_status();
-    virtual void play_with(vector<Player *> &all_players, istream *input = &cin, ostream *output = &cout);
+    vector<string> play_with(vector<Player *> &all_players);
 };
 
-Player::Player(string type, int player_number, int hand_count,
-               int foot_count, int finger_count, int toe_count, int turns)
-    : type(type), player_number(player_number), skip(false), alive(true), turns(turns) {
+Player::Player(string type, int player_number, int hand_count, int foot_count,
+               int finger_count, int toe_count, ostream *output, istream *input,
+               int turns)
+    : type(type), player_number(player_number), skip(false), alive(true), output(output), input(input), turns(turns) {
     for (int i = 0; i < hand_count; ++i) {
         Hand temp_hand(finger_count);
         hands.push_back(temp_hand);
@@ -217,77 +218,92 @@ string Player::get_status() {
         result += foot.get_status();
     }
     result += ")";
+    if (skip) result += " [skipping]";
     return result;
 }
 
-/* assumes player is available to play */
-void Player::play_with(vector<Player *> &all_players, istream *input, ostream *output) {
+/**
+ * assumes player is available to play
+ * @return vector<string> of actions madde
+ */
+vector<string> Player::play_with(vector<Player *> &all_players) {
+    vector<string> actions;
     for (int i = 0; i < turns; ++i) {
-        string action;
-        *input >> action;
+        string action, line_string;
+        outputTo(output, "Enter your move.");
+        line_string = getlineFrom(input, output);
+        istringstream line(line_string);
+        line >> action;
         if (action == "tap") {
-            string from, to;
+            string from, to, player_num_arg;
             unsigned int player_number;
-            *input >> from >> player_number >> to;
-            if (!(1 <= player_number && player_number <= all_players.size())) {
-                --i;
-                *output << "Player number out of bounds! Enter action again.\n";
-                continue;
+            line >> from >> player_num_arg >> to;
+            if (is_valid_int(player_num_arg)) {
+                player_number = stoi(player_num_arg);
+                if (!(1 <= player_number && player_number <= all_players.size())) {
+                    outputTo(output, "Player number out of bounds! Enter action again.");
+                    --i;
+                    continue;
+                }
+            } else {
+                outputTo(output, "Player number must be an integer! Enter action again.");
             }
             Player *target = all_players[player_number - 1];
             if (!target->is_alive()) {
+                outputTo(output, "Target player is dead. Enter action again.");
                 --i;
-                *output << "Target player is dead. Enter action again.\n";
                 continue;
             }
             if (target->get_team_number() == this->get_team_number()) {
+                outputTo(output, "Friendly fire is not allowed! Enter action again.");
                 --i;
-                *output << "Friendly fire is not allowed! Enter action again.\n";
                 continue;
             }
             if (!attack(*target, from, to)) {
+                outputTo(output, "Attack invalid! Enter action again.");
                 --i;
-                *output << "Attack invalid! Enter action again.\n";
                 continue;
             }
         } else if (action == "disthands") {
             vector<int> changes(get_hands_count());
             for (auto &item : changes) {
-                *input >> item;
+                line >> item;
             }
             if (!distribute("hands", changes)) {
+                outputTo(output, "Invalid distribution! Enter action again.");
                 --i;
-                *output << "Invalid distribution! Enter action again.\n";
                 continue;
             }
         } else if (action == "distfeet") {
             vector<int> changes(get_feet_count());
             for (auto &item : changes) {
-                *input >> item;
+                line >> item;
             }
             if (!distribute("feet", changes)) {
+                outputTo(output, "Invalid distribution! Enter action again.");
                 --i;
-                *output << "Invalid distribution! Enter action again.\n";
                 continue;
             }
         } else {
+            outputTo(output, "Invalid keyword! Try again.");
             --i;
-            *output << "Invalid action! Try again\n";
-            iclear_buffer(input);
+            continue;
         }
+        actions.push_back(line_string);
     }
+    return actions;
 }
 
 class Human : public Player {
    public:
-    Human(int player_number)
-        : Player("human", player_number, 2, 2, 5, 5) {}
+    Human(int player_number, ostream *output = &cout, istream *input = &cin)
+        : Player("human", player_number, 2, 2, 5, 5, output, input) {}
 };
 
 class Alien : public Player {
    public:
-    Alien(int player_number)
-        : Player("alien", player_number, 4, 2, 3, 2) {}
+    Alien(int player_number, ostream *output = &cout, istream *input = &cin)
+        : Player("alien", player_number, 4, 2, 3, 2, output, input) {}
     void skip_turn(bool force = false) override {
         if (force) Player::skip_turn();
     }
@@ -295,8 +311,8 @@ class Alien : public Player {
 
 class Zombie : public Player {
    public:
-    Zombie(int player_number)
-        : Player("zombie", player_number, 1, 0, 4, 0, 2) {}
+    Zombie(int player_number, ostream *output = &cout, istream *input = &cin)
+        : Player("zombie", player_number, 1, 0, 4, 0, output, input, 2) {}
     void attacked_by(Player &other, Extremity &other_ex, Extremity &my_ex) override {
         if (hands.size() == 1 && !my_ex.is_alive()) {  // starting hand dies
             Hand new_hand(4);
@@ -308,8 +324,8 @@ class Zombie : public Player {
 
 class Doggo : public Player {
    public:
-    Doggo(int player_number)
-        : Player("doggo", player_number, 0, 4, 0, 4) {}
+    Doggo(int player_number, ostream *output = &cout, istream *input = &cin)
+        : Player("doggo", player_number, 0, 4, 0, 4, output, input) {}
     void attacked_by(Player &other, Extremity &other_ex, Extremity &my_ex) override {
         Player::attacked_by(other, other_ex, my_ex);
         if (other.get_type() != this->get_type()) {  // not doggo type
@@ -321,13 +337,14 @@ class Doggo : public Player {
 class Team {
    private:
     int team_number;
+    vector<ostream *> outputs;
     vector<Player *> players;
     int current_player_index;
     Player *current_player;
     bool get_next_available_player();
 
    public:
-    Team(int team_number);
+    Team(int team_number, vector<ostream *> outputs = {});
     int get_team_number() { return team_number; }
     bool is_alive();
     int get_players_alive_count();
@@ -336,7 +353,7 @@ class Team {
     string get_status();
 };
 
-Team::Team(int team_number) : team_number(team_number), current_player_index(0), current_player(nullptr) {
+Team::Team(int team_number, vector<ostream *> outputs) : team_number(team_number), outputs(outputs), current_player_index(0), current_player(nullptr) {
 }
 
 bool Team::is_alive() {
@@ -364,9 +381,16 @@ bool Team::play_with(vector<Player *> &all_players) {
         return false;
     }
     if (!get_next_available_player()) {
+        outputToAll(outputs, "Team " + to_string(team_number) + " has been skipped.");
         return false;
     }
-    current_player->play_with(all_players);
+    int player_index = current_player->get_player_number() - 1;
+    outputToAll(outputs, "Waiting for player " + to_string(player_index+1) + ".", outputs[player_index]);
+    vector<string> actions_made = current_player->play_with(all_players);
+    outputToAll(outputs, "Player " + to_string(player_index + 1) + " actions:", outputs[player_index]);
+    for (auto &&action : actions_made) {
+        outputToAll(outputs, "=> " + action, outputs[player_index]);
+    }
     return true;
 }
 
@@ -395,6 +419,7 @@ bool Team::get_next_available_player() {
     do {
         if (current_player->is_alive()) {
             if (current_player->check_skip()) {
+                outputToAll(outputs, "Player " + to_string(current_player->get_player_number()) + " has been skipped.");
                 ++players_skipped;
             } else {
                 break;
@@ -415,86 +440,10 @@ bool Team::get_next_available_player() {
 
 string Team::get_status() {
     string result = "Team " + to_string(team_number) + ": ";
-    players[0]->get_status();
-    for (size_t i = 1; i < players.size(); ++i) {
+    for (size_t i = 0; i < players.size(); ++i) {
+        result += players[i]->get_status();
         result += " | ";
-        players[i]->get_status();
     }
+    result.erase(result.end()-3, result.end());
     return result;
 }
-
-string get_game_status(vector<Team> &teams) {
-    string result = "";
-    for (auto &team : teams) {
-        result += team.get_status();
-    }
-    return result;
-}
-
-/* int main() {
-    // input
-    int p, t;
-    cin >> p >> t;
-    vector<Team> teams;
-    for (int i = 1; i <= t; ++i) {
-        Team new_team(i);
-        teams.push_back(new_team);
-    }
-    vector<Player *> players;
-    for (int i = 0; i < p; ++i) {
-        string type;
-        int team;
-        cin >> type >> team;
-        while (!(1 <= team && team <= t)) {
-            --i;
-            cout << "Invalid team number! Try again.\n";
-            continue;
-        }
-        Player *new_player;
-        if (type == "human") {
-            new_player = new Human(i + 1);
-        } else if (type == "alien") {
-            new_player = new Alien(i + 1);
-        } else if (type == "zombie") {
-            new_player = new Zombie(i + 1);
-        } else if (type == "doggo") {
-            new_player = new Doggo(i + 1);
-        } else {
-            --i;
-            cout << "Invalid keyword! Try again.\n";
-            continue;
-        }
-        players.push_back(new_player);
-        teams[team - 1].add_player(new_player);
-    }
-    // game loop
-    int current_team_index = 0;
-    Team *winning_team = nullptr;
-    get_game_status(teams);
-    for (;;) {
-        bool played = teams[current_team_index].play_with(players);
-        // next
-        current_team_index = (current_team_index + 1) % teams.size();
-        int teams_alive = 0;
-        for (auto &team : teams) {
-            if (team.is_alive()) {
-                ++teams_alive;
-                winning_team = &team;
-            }
-            if (teams_alive >= 2) {
-                break;
-            }
-        }
-        if (played) get_game_status(teams);
-        if (teams_alive == 1) {
-            break;
-        }
-    }
-    // game conclusion
-    cout << "Team " << winning_team->get_team_number() << " wins!" << endl;
-    // clean up
-    for (auto &player_ptr : players) {
-        delete player_ptr;
-    }
-    return 0;
-} */

@@ -2,42 +2,10 @@
 #include <string>
 #include <typeinfo>
 #include "chopsticks.hpp"
+#include "functions.hpp"
 #include "socketstream/socketstream.hh"
 
 using namespace std;
-
-const int CLIENT_END = -1;
-const int CLIENT_OUTPUT = 0;
-const int CLIENT_INPUT = 1;
-
-/* don't include \n in output */
-void outputTo(ostream *output, string line = "") {
-    if (output != &cout) *output << CLIENT_OUTPUT << endl;
-    *output << line << endl;
-}
-
-/* output to all except 3rd param, don't include \n in output */
-void outputToAll(vector<ostream *> outputs, string line = "", ostream *except = nullptr) {
-    for (ostream *output : outputs) {
-        if (output != except) {
-            outputTo(output, line);
-        }
-    }
-}
-
-string getlineFrom(istream *input, ostream *output) {
-    string result;
-    if (input != &cin) *output << CLIENT_INPUT << endl;
-    getline(*input, result);
-    return result;
-}
-
-bool is_valid_int(string s) {
-    string::const_iterator it = s.begin();
-    if (*it != '-' && !isdigit(*it)) return false;
-    while (it != s.end() && (isdigit(*it))) it++;
-    return !s.empty() && it == s.end();
-}
 
 void runServer(string port) {
     // check player number validity
@@ -97,16 +65,18 @@ void runServer(string port) {
         outputTo(outputs[i], "Choose 1: Human || Alien || Zombie || Doggo");
 
         string type = getlineFrom(inputs[i], outputs[i]);
+        istringstream line(type);
+        line >> type;
 
         Player *new_player;
         if (type == "Human" || type == "human") {
-            new_player = new Human(i + 1);
+            new_player = new Human(i + 1, outputs[i], inputs[i]);
         } else if (type == "Alien" || type == "alien") {
-            new_player = new Alien(i + 1);
+            new_player = new Alien(i + 1, outputs[i], inputs[i]);
         } else if (type == "Zombie" || type == "zombie") {
-            new_player = new Zombie(i + 1);
+            new_player = new Zombie(i + 1, outputs[i], inputs[i]);
         } else if (type == "Doggo" || type == "doggo") {
-            new_player = new Doggo(i + 1);
+            new_player = new Doggo(i + 1, outputs[i], inputs[i]);
         } else {
             outputTo(outputs[i], "Invalid keyword! Try again.");
             outputTo(outputs[i]);
@@ -159,9 +129,9 @@ void runServer(string port) {
             // check validity
             int check = 0;
             for (int i = 0; i < player_count; ++i) {
-                ++group_player_counts[group_numbers[i]-1];
+                ++group_player_counts[group_numbers[i] - 1];
             }
-            for (int i = 0; i < player_count && group_player_counts[i] != 0; ++i, team_count = i+1) {
+            for (int i = 0; i < player_count && group_player_counts[i] != 0; ++i, team_count = i) {
                 check += group_player_counts[i];
             }
             valid_group = group_player_counts[0] != 0 && group_player_counts[1] != 0 && check == player_count;
@@ -169,12 +139,12 @@ void runServer(string port) {
         }
         // valid grouping, build teams
         for (int i = 1; i <= team_count; ++i) {
-            Team new_team(i);
+            Team new_team(i, outputs);
             teams.push_back(new_team);
         }
         for (int i = 0; i < player_count; ++i) {
             players[i]->set_team_number(group_numbers[i]);
-            teams[group_numbers[i]-1].add_player(players[i]);
+            teams[group_numbers[i] - 1].add_player(players[i]);
         }
     }
     outputToAll(outputs, "Grouping successful!");
@@ -184,7 +154,43 @@ void runServer(string port) {
     outputToAll(outputs);
 
     // actual game
-    
+    int current_team_index = 0;
+    Team *winning_team = nullptr;
+    // output initial game status
+    cerr << teams.size();
+    for (Team &team : teams) {
+        outputToAll(outputs, team.get_status());
+    }
+    outputToAll(outputs);
+    for (int teams_alive = 0; teams_alive != 1;) {
+        bool played = teams[current_team_index].play_with(players);
+        // next
+        current_team_index = (current_team_index + 1) % teams.size();
+        // check win
+        teams_alive = 0;
+        for (auto &team : teams) {
+            if (team.is_alive()) {
+                ++teams_alive;
+                winning_team = &team;
+            }
+            if (teams_alive >= 2) {
+                break;
+            }
+        }
+        // output game status
+        if (played) {
+            for (Team &team : teams) {
+                outputToAll(outputs, team.get_status());
+            }
+            outputToAll(outputs);
+        }
+    }
+    // game conclusion
+    outputToAll(outputs, "Team " + to_string(winning_team->get_team_number()) + " wins!");
+    // clean up
+    for (auto &player_ptr : players) {
+        delete player_ptr;
+    }
 }
 
 /* generic client, no logic */
