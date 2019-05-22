@@ -1,3 +1,7 @@
+#pragma once
+#ifndef CHOPSTICKS_HPP
+#define CHOPSTICKS_HPP
+
 #include <iostream>
 #include <limits>
 #include <sstream>
@@ -468,3 +472,5 @@ string Team::get_status() {
     else if (next == nullptr) result += "Team will be skipped.";
     return result;
 }
+
+#endif /* CHOPSTICKS_HPP */
