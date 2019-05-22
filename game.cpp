@@ -186,11 +186,25 @@ void runServer(string port) {
         }
     }
     // game conclusion
-    outputToAll(outputs, "Team " + to_string(winning_team->get_team_number()) + " wins!");
+    int winning_team_number = winning_team->get_team_number();
+    for (int i = 0; i < player_count; ++i) {
+        if (players[i]->get_team_number() == winning_team_number) {
+            outputTo(outputs[i], "Congratulations! Team " + to_string(winning_team_number) + " wins!");
+        } else {
+            outputTo(outputs[i], "You lose. Team " + to_string(winning_team_number) + " wins!");
+        }
+    }
+    // close clients
+    for (int i = 1; i < player_count; ++i) {
+        *outputs[i] << CLIENT_END;
+        sockets[i].close();
+    }
     // clean up
     for (auto &player_ptr : players) {
         delete player_ptr;
     }
+    listeningSocket.close();
+    cout << "Connections closed.";
 }
 
 /* generic client, no logic */
