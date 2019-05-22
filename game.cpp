@@ -172,6 +172,9 @@ int main(int argc, char *argv[]) {
             cerr << "Port must be from 1024 to 65535 only." << endl;
             return 2;
         }
+    } else {
+        cerr << "Port must be an integer." << endl;
+        return 3;
     }
     // run
     if (argc == 2) {
