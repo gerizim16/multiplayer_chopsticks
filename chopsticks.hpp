@@ -20,7 +20,7 @@ class Extremity {
         : max_count(max_count), type(type), alive(true), count(1) {}
     string get_type() { return type; }
     bool const is_alive() { return alive; }
-    char const get_status() { return alive ? '0' + count : 'X'; }
+    string const get_status() { return alive ? to_string(count) + "/" + to_string(max_count) + " " : "X"; }
     int const get_count() { return count; }
     int const get_max_count() { return max_count; }
     bool tap(Extremity &other);
@@ -212,7 +212,6 @@ string Player::get_status() {
     string result = "P" + to_string(player_number) + type[0] + " (";
     for (auto &hand : hands) {
         result += hand.get_status();
-        result += "/" + to_string(hand.get_max_count()) + " ";
     }
 
     if (hands.size() != 0) result.pop_back(); //for dogs with no hands
@@ -221,7 +220,6 @@ string Player::get_status() {
     result += " : ";
     for (auto &foot : feet) {
         result += foot.get_status();
-        result += "/" + to_string(foot.get_max_count()) + " ";
     }
 
     if (feet.size() != 0) result.pop_back(); //for zombies with no feet
