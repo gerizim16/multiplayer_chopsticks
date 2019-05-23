@@ -332,6 +332,12 @@ string Player::play_with(vector<Player *> &all_players) {
             string from, to, player_num_arg;
             unsigned int player_number;
             line >> from >> player_num_arg >> to;
+
+            if (from.size() != 2 || to.size() != 2){
+                outputTo(output, "Please enter valid attack arguments");
+                continue;
+
+            }
             if (is_valid_int(player_num_arg)) {
                 player_number = stoi(player_num_arg);
                 if (!(1 <= player_number && player_number <= all_players.size())) {
@@ -340,6 +346,7 @@ string Player::play_with(vector<Player *> &all_players) {
                 }
             } else {
                 outputTo(output, "Player number must be an integer! Enter action again.");
+                continue;
             }
             Player *target = all_players[player_number - 1];
             if (!target->is_alive()) {
@@ -360,29 +367,46 @@ string Player::play_with(vector<Player *> &all_players) {
                 continue;
             }
 
+            bool valid = true;
             if (action == "disthands"){
-                bool valid = is_valid_string(line_string,get_hands_count(true)+1); //+1 for "disthands" keyword
-                if (!valid){
-                    outputTo(output, "Please enter a valid number of arguments.");
-                    continue;
-                }
+                valid = is_valid_string(line_string,get_hands_count(true)+1); //+1 for "disthands" keyword
             } else if (action == "distfeet"){
-                bool valid = is_valid_string(line_string,get_feet_count(true)+1); //+1 for "distfeet" keyword
-                if (!valid){
-                    outputTo(output, "Please enter a valid number of arguments.");
-                    continue;
-                }
+                valid = is_valid_string(line_string,get_feet_count(true)+1); //+1 for "distfeet" keyword
+            }
+
+            if (!valid){
+                outputTo(output, "Please enter a valid number of arguments.");
+                continue;
             }
 
             vector<int> changes(action == "disthands" ? get_hands_count() : get_feet_count());
             
+            bool is_valid = true;
             for (size_t i = 0; i < changes.size(); ++i) {
+                string to_check = "";
                 if (action == "disthands" && hands[i].is_alive()) {
-                    line >> changes[i];
+                    line >> to_check;
+                    if (!is_valid_int(to_check)){
+                        is_valid = false;
+                        break;
+                    }
+                    changes[i] = stoi(to_check);
+                    
                 } else if (action == "distfeet" && feet[i].is_alive()) {
-                    line >> changes[i];
+                    line >> to_check;
+                    if (!is_valid_int(to_check)){
+                        is_valid = false;
+                        break;
+                    }
+                    changes[i] = stoi(to_check);
                 }
             }
+
+            if (!is_valid){
+                outputTo(output, "Please enter an integer.");
+                continue;
+            }
+
             if (!distribute(action == "disthands" ? "hands" : "feet", changes)) {
                 // outputTo(output, "Invalid distribution! Enter action again.");
                 continue;

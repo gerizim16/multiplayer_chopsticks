@@ -49,8 +49,6 @@ bool is_valid_string(std::string s, int needed){
         count++;
     }
 
-    std::cout << needed << " | " << count;
-
     if (count != needed) return false;
     return true;
 }
