@@ -147,6 +147,10 @@ Player::Player(string type, int player_number, int hand_count, int foot_count,
 bool Player::attack(Player &other_player, string my_stats, string other_stats) {
     Extremity *other_ex = other_player.get_ex(other_stats);
     Extremity *my_ex = this->get_ex(my_stats);
+    if (my_ex->get_count() == 0) {
+        outputTo(output, "A free hand or foot cannot attack!");
+        return false;
+    }
     if (other_ex == nullptr || my_ex == nullptr) return false;
     if (!my_ex->tap(*other_ex)) return false;
     if (other_ex->get_type() == "foot" && !other_ex->is_alive()) {
@@ -176,7 +180,7 @@ bool Player::distribute(string mode, vector<int> change) {
     for (size_t i = 0; i < extr.size(); ++i) {
         int temp_change = change[i];
         if (extr[i]->is_alive()) {
-            if (!(1 <= temp_change && temp_change < extr[i]->get_max_count())) {
+            if (!(0 <= temp_change && temp_change < extr[i]->get_max_count())) {
                 outputTo(output, "Distribution out of valid bounds.");
                 return false;
             }
@@ -246,6 +250,12 @@ Extremity *Player::get_ex(string mode) {
 
 string Player::get_status() {
     string result = "P" + to_string(player_number) + type[0] + " (";
+
+    if (!alive){
+        result.pop_back();
+        result += "[dead]";
+        return result;
+    }
     for (auto &hand : hands) {
         result += hand.get_status();
     }
@@ -254,9 +264,7 @@ string Player::get_status() {
         result += foot.get_status();
     }
     result += ") [" + to_string(max_fingers) + ":" + to_string(max_toes) + "]";
-    if (!alive)
-        result += " [dead]";
-    else if (skip)
+    if (skip)
         result += " [skipping]";
     return result;
 }
