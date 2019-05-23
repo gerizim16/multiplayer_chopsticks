@@ -5,6 +5,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <sstream>
 
 const int CLIENT_END = -1;
 const int CLIENT_OUTPUT = 0;
@@ -37,6 +38,21 @@ bool is_valid_int(std::string s) {
     if (*it != '-' && !isdigit(*it)) return false;
     while (it != s.end() && (isdigit(*it))) it++;
     return !s.empty() && it == s.end();
+}
+
+bool is_valid_string(std::string s, int needed){
+    std::stringstream test(s);
+    std::string word;
+
+    int count = 0;
+    while (test >> word){
+        count++;
+    }
+
+    std::cout << needed << " | " << count;
+
+    if (count != needed) return false;
+    return true;
 }
 
 #endif /* FUNCTIONS_HPP */

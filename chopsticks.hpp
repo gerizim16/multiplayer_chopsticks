@@ -119,6 +119,7 @@ class Player {
         }
         return count;
     }
+    int const get_turns() { return turns; }
     bool const is_alive() { return alive; }
     bool attack(Player &other, string my_stats, string other_stats);
     bool distribute(string mode, vector<int> change);
@@ -126,7 +127,7 @@ class Player {
     bool check_skip(bool modify_skip = false);
     bool const get_skip() { return skip; }
     string get_status();
-    vector<string> play_with(vector<Player *> &all_players);
+    string play_with(vector<Player *> &all_players);
 };
 
 Player::Player(string type, int player_number, int hand_count, int foot_count,
@@ -147,11 +148,11 @@ Player::Player(string type, int player_number, int hand_count, int foot_count,
 bool Player::attack(Player &other_player, string my_stats, string other_stats) {
     Extremity *other_ex = other_player.get_ex(other_stats);
     Extremity *my_ex = this->get_ex(my_stats);
+    if (other_ex == nullptr || my_ex == nullptr) return false;
     if (my_ex->get_count() == 0) {
         outputTo(output, "A free hand or foot cannot attack!");
         return false;
     }
-    if (other_ex == nullptr || my_ex == nullptr) return false;
     if (!my_ex->tap(*other_ex)) return false;
     if (other_ex->get_type() == "foot" && !other_ex->is_alive()) {
         other_player.skip_turn();
@@ -191,7 +192,7 @@ bool Player::distribute(string mode, vector<int> change) {
         extremeties_sum += extr[i]->get_count();
     }
     if (change_sum != extremeties_sum) {
-        outputTo(output, "Distribution sum are not equal.");
+        outputTo(output, "Distribution sum are not equal."); //disthands a a occurs
         return false;
     }
     // modify
@@ -271,17 +272,24 @@ string Player::get_status() {
 
 /**
  * assumes player is available to play
- * @return vector<string> of actions madde
+ * @return a string of action madde
  */
-vector<string> Player::play_with(vector<Player *> &all_players) {
-    vector<string> actions;
-    for (int i = 0; i < turns; ++i) {
+string Player::play_with(vector<Player *> &all_players) {
+    string action_made;
+    bool valid_action = false;
+    while (!valid_action){
         string action, line_string;
         outputTo(output, "Enter your move.");
         line_string = getlineFrom(input, output);
         istringstream line(line_string);
         line >> action;
+
         if (action == "tap") {
+            bool valid = is_valid_string(line_string,4);
+            if (!valid){
+                outputTo(output, "Please enter a valid number of arguments.");
+                continue;
+            }
             string from, to, player_num_arg;
             unsigned int player_number;
             line >> from >> player_num_arg >> to;
@@ -289,7 +297,6 @@ vector<string> Player::play_with(vector<Player *> &all_players) {
                 player_number = stoi(player_num_arg);
                 if (!(1 <= player_number && player_number <= all_players.size())) {
                     outputTo(output, "Player number out of bounds! Enter action again.");
-                    --i;
                     continue;
                 }
             } else {
@@ -298,46 +305,59 @@ vector<string> Player::play_with(vector<Player *> &all_players) {
             Player *target = all_players[player_number - 1];
             if (!target->is_alive()) {
                 outputTo(output, "Target player is dead. Enter action again.");
-                --i;
                 continue;
             }
             if (target->get_team_number() == this->get_team_number()) {
                 outputTo(output, "Friendly fire is not allowed! Enter action again.");
-                --i;
                 continue;
             }
             if (!attack(*target, from, to)) {
                 outputTo(output, "Attack invalid! Enter action again.");
-                --i;
                 continue;
             }
         } else if (action == "disthands" || action == "distfeet") {
-            vector<int> changes(action == "disthands" ? get_hands_count() : get_feet_count());
             if ((action == "disthands" ? get_hands_count(true) : get_feet_count(true)) <= 1) {
                 outputTo(output, "Unable to redistribute.");
-                --i;
                 continue;
             }
+
+            if (action == "disthands"){
+                bool valid = is_valid_string(line_string,get_hands_count(true)+1); //+1 for "disthands" keyword
+                if (!valid){
+                    outputTo(output, "Please enter a valid number of arguments.");
+                    continue;
+                }
+            } else if (action == "distfeet"){
+                bool valid = is_valid_string(line_string,get_feet_count(true)+1); //+1 for "distfeet" keyword
+                if (!valid){
+                    outputTo(output, "Please enter a valid number of arguments.");
+                    continue;
+                }
+            }
+
+            vector<int> changes(action == "disthands" ? get_hands_count() : get_feet_count());
+            
             for (size_t i = 0; i < changes.size(); ++i) {
                 if (action == "disthands" && hands[i].is_alive()) {
                     line >> changes[i];
-                } else if (feet[i].is_alive()) {
+                } else if (action == "distfeet" && feet[i].is_alive()) {
                     line >> changes[i];
                 }
             }
             if (!distribute(action == "disthands" ? "hands" : "feet", changes)) {
                 // outputTo(output, "Invalid distribution! Enter action again.");
-                --i;
                 continue;
             }
         } else {
             outputTo(output, "Invalid keyword! Try again.");
-            --i;
             continue;
         }
-        actions.push_back(line_string);
+        action_made = line_string;
+        valid_action = true;
+
+
     }
-    return actions;
+    return action_made;
 }
 
 class Human : public Player {
@@ -435,7 +455,10 @@ bool Team::play_with(vector<Player *> &all_players) {
     }
     int player_index = current_player->get_player_number() - 1;
     outputToAll(outputs, "Waiting for player " + to_string(player_index + 1) + " from team " + to_string(team_number) + ".", outputs[player_index]);
-    vector<string> actions_made = current_player->play_with(all_players);
+    vector<string> actions_made;
+    for (int i = 0; i < current_player->get_turns(); ++i){
+        actions_made.push_back(current_player->play_with(all_players));
+    }
     outputToAll(outputs, "Player " + to_string(player_index + 1) + " actions:", outputs[player_index]);
     for (auto &&action : actions_made) {
         outputToAll(outputs, "=> " + action, outputs[player_index]);

@@ -13,8 +13,7 @@ void runServer(string port) {
     for (;;) {
         string players_argument;
         cout << "How many players are there?" << endl;
-        cin >> players_argument;
-        cin.ignore();
+        getline(cin,players_argument);
         if (is_valid_int(players_argument)) {
             player_count = stoi(players_argument);
             if (2 <= player_count && player_count <= 6) {
@@ -23,7 +22,7 @@ void runServer(string port) {
                 cout << "There must be 2 to 6 players in a game." << endl;
             }
         } else {
-            cout << "That is not an integer!" << endl;
+            cout << "That is not a valid integer!" << endl;
         }
     }
 
@@ -65,8 +64,8 @@ void runServer(string port) {
         outputTo(outputs[i], "Choose 1: Human || Alien || Zombie || Doggo");
 
         string type = getlineFrom(inputs[i], outputs[i]);
-        istringstream line(type);
-        line >> type;
+        //istringstream line(type);
+        //line >> type;
 
         Player *new_player;
         if (type == "Human" || type == "human") {
@@ -122,7 +121,7 @@ void runServer(string port) {
                         --i;
                     }
                 } else {
-                    outputTo(outputs[i], "Group number must be an integer.");
+                    outputTo(outputs[i], "Group number must be a valid integer.");
                     --i;
                 }
             }
