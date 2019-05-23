@@ -161,20 +161,51 @@ void runServer(string port) {
     }
     outputToAll(outputs);
     for (int teams_alive = 0; teams_alive != 1;) {
-        bool played = teams[current_team_index].play_with(players);
-        // next
-        current_team_index = (current_team_index + 1) % teams.size();
-        // check win
-        teams_alive = 0;
-        for (auto &team : teams) {
-            if (team.is_alive()) {
-                ++teams_alive;
-                winning_team = &team;
+        bool played = true;
+        //teams[current_team_index].play_with(players);
+
+        if (!teams[current_team_index].is_alive()) {
+            played = false;
+        }
+
+        if (teams[current_team_index].get_next_available_player(true, true) == nullptr) {
+            outputToAll(outputs, "Team " + to_string(teams[current_team_index].get_team_number()) + " has been skipped.");
+            played = false;
+        }
+
+        if (played){
+            int player_index = teams[current_team_index].get_current_player()->get_player_number() - 1;
+            outputToAll(outputs, "Waiting for player " + to_string(player_index + 1) + " from team " + to_string(teams[current_team_index].get_team_number()) + ".", outputs[player_index]);
+            
+            vector<string> actions_made;
+            for (int i = 0; i < teams[current_team_index].get_current_player()->get_turns(); ++i){
+                actions_made.push_back(teams[current_team_index].get_current_player()->play_with(players));
+
+                // check win
+                teams_alive = 0;
+                for (auto &team : teams) {
+                    if (team.is_alive()) {
+                        ++teams_alive;
+                        winning_team = &team;
+                    }
+                    if (teams_alive >= 2) {
+                        break;
+                    }
+                }
+
+                if (teams_alive == 1){
+                    break;
+                }
             }
-            if (teams_alive >= 2) {
-                break;
+
+            outputToAll(outputs, "Player " + to_string(player_index + 1) + " actions:", outputs[player_index]);
+            for (auto &&action : actions_made) {
+                outputToAll(outputs, "=> " + action, outputs[player_index]);
             }
         }
+        // next
+        current_team_index = (current_team_index + 1) % teams.size();
+        
         // output game status
         if (played) {
             for (Team &team : teams) {

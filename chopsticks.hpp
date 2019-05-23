@@ -119,6 +119,24 @@ class Player {
         }
         return count;
     }
+    vector<Hand> get_alive_hands(){
+        vector<Hand> alive_hands;
+        for (auto &hand : hands){
+            if (hand.is_alive()){
+                alive_hands.push_back(hand);
+            }
+        }
+        return alive_hands;
+    }
+    vector<Foot> get_alive_feet(){
+        vector<Foot> alive_feet;
+        for (auto &foot : feet){
+            if (foot.is_alive()){
+                alive_feet.push_back(foot);
+            }
+        }
+        return alive_feet;
+    }
     int const get_turns() { return turns; }
     bool const is_alive() { return alive; }
     bool attack(Player &other, string my_stats, string other_stats);
@@ -126,6 +144,7 @@ class Player {
     virtual void skip_turn(bool force = false) { skip = true; }
     bool check_skip(bool modify_skip = false);
     bool const get_skip() { return skip; }
+    bool check_for_free_extremeties();
     string get_status();
     string play_with(vector<Player *> &all_players);
 };
@@ -235,6 +254,26 @@ void Player::attacked_by(Player &other, Extremity &other_ex,
             return;
         }
     }
+}
+
+//finds out if player can attack
+bool Player::check_for_free_extremeties(){
+    vector<Hand> hands_alive = this->get_alive_hands();
+    vector<Foot> feet_alive = this->get_alive_feet();
+    int free_hands = 0;
+    int free_feet = 0;
+    for (auto &hand: hands_alive){
+        if (hand.get_count() == 0) ++free_hands;
+    }
+
+    for (auto &foot: feet_alive){
+        if (foot.get_count() == 0) ++free_feet;
+    }
+
+    if (free_hands == hands_alive.size() && free_feet == feet_alive.size()) {
+        return true;
+    }
+    return false;
 }
 
 /* @return valid pointer if valid parameter and in bounds else std::nullptr */
@@ -408,9 +447,7 @@ class Team {
     vector<Player *> players;
     int current_player_index;
     Player *current_player;
-    Player *get_next_available_player(bool inplace = false, bool output_status = false);
-    Player *check_for_next_player();
-
+    
    public:
     Team(int team_number, vector<ostream *> outputs = {});
     int get_team_number() { return team_number; }
@@ -419,6 +456,10 @@ class Team {
     bool play_with(vector<Player *> &all_players);
     void add_player(Player *new_player);
     string get_status();
+    bool check_for_free_extremeties();
+    Player *get_next_available_player(bool inplace = false, bool output_status = false);
+    Player *get_current_player() { return current_player;}
+
 };
 
 Team::Team(int team_number, vector<ostream *> outputs) : team_number(team_number), outputs(outputs), current_player_index(0), current_player(nullptr) {
@@ -495,7 +536,7 @@ Player *Team::get_next_available_player(bool modify, bool output_status) {
 
     do {  // while not returning back to first check player
         if (next_player->is_alive()) {
-            if (next_player->check_skip(modify)) {
+            if (next_player->check_skip(modify) || next_player->check_for_free_extremeties()) {
                 if (output_status) outputToAll(outputs, "Player " + to_string(next_player->get_player_number()) + " has been skipped.");
                 ++players_skipped;
             } else {
