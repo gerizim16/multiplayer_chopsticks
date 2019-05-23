@@ -22,6 +22,7 @@ class Extremity {
    public:
     Extremity(int max_count, string type)
         : max_count(max_count), type(type), alive(true), count(1) {}
+    virtual ~Extremity() {}
     string get_type() { return type; }
     bool const is_alive() { return alive; }
     string const get_status() { return alive ? to_string(count) : "X"; }
@@ -31,7 +32,10 @@ class Extremity {
     bool set_count(int new_count);
 };
 
-/* @return true if this and other extremity is alive else false */
+/**
+ * assumes other is not a nullptr
+ * @return true if this and other extremity is alive else false 
+ */
 bool Extremity::tap(Extremity &other) {
     if (!other.is_alive() || !this->is_alive()) return false;
     other.count += this->count;
@@ -82,68 +86,33 @@ class Player {
     int team_number;
     bool skip;
     bool alive;
-    vector<Hand> hands;
-    vector<Foot> feet;
+    vector<Extremity *> hands;
+    vector<Extremity *> feet;
     int max_fingers;
     int max_toes;
     ostream *output;
     istream *input;
     int turns;
     Extremity *get_ex(string mode);
-
-    // to keep track of attacked by events
     virtual void attacked_by(Player &other, Extremity &other_ex, Extremity &my_ex);
+    vector<Extremity *> get_alive_extremities(string mode);
 
    public:
     Player(string type, int player_number, int hand_count, int foot_count,
            int finger_count, int toe_count, ostream *output = &cout, istream *input = &cin,
            int turns = 1);
-    virtual ~Player() {}
+    virtual ~Player();
     string get_type() { return type; }
     int const get_player_number() { return player_number; }
-    void set_team_number(int new_team_number) { team_number = new_team_number; }
     int const get_team_number() { return team_number; }
-    int const get_hands_count(bool only_alive = false) {
-        if (!only_alive) return hands.size();
-        int count = 0;
-        for (auto &hand : hands) {
-            if (hand.is_alive()) ++count;
-        }
-        return count;
-    }
-    int const get_feet_count(bool only_alive = false) {
-        if (!only_alive) return feet.size();
-        int count = 0;
-        for (auto &foot : feet) {
-            if (foot.is_alive()) ++count;
-        }
-        return count;
-    }
-    vector<Hand> get_alive_hands(){
-        vector<Hand> alive_hands;
-        for (auto &hand : hands){
-            if (hand.is_alive()){
-                alive_hands.push_back(hand);
-            }
-        }
-        return alive_hands;
-    }
-    vector<Foot> get_alive_feet(){
-        vector<Foot> alive_feet;
-        for (auto &foot : feet){
-            if (foot.is_alive()){
-                alive_feet.push_back(foot);
-            }
-        }
-        return alive_feet;
-    }
+    void set_team_number(int new_team_number) { team_number = new_team_number; }
+    int const get_extremities_count(string mode, bool only_alive = false);
     int const get_turns() { return turns; }
     bool const is_alive() { return alive; }
     bool attack(Player &other, string my_stats, string other_stats);
     bool distribute(string mode, vector<int> change);
     virtual void skip_turn(bool force = false) { skip = true; }
     bool check_skip(bool modify_skip = false);
-    bool const get_skip() { return skip; }
     bool check_for_free_extremeties();
     string get_status();
     string play_with(vector<Player *> &all_players);
@@ -154,12 +123,21 @@ Player::Player(string type, int player_number, int hand_count, int foot_count,
                int turns)
     : type(type), player_number(player_number), skip(false), alive(true), max_fingers(finger_count), max_toes(toe_count), output(output), input(input), turns(turns) {
     for (int i = 0; i < hand_count; ++i) {
-        Hand temp_hand(finger_count);
+        Hand *temp_hand = new Hand(finger_count);
         hands.push_back(temp_hand);
     }
     for (int i = 0; i < foot_count; ++i) {
-        Foot temp_foot(toe_count);
+        Foot *temp_foot = new Foot(toe_count);
         feet.push_back(temp_foot);
+    }
+}
+
+Player::~Player() {
+    for (auto &hand : hands) {
+        delete hand;
+    }
+    for (auto &foot : feet) {
+        delete foot;
     }
 }
 
@@ -167,12 +145,28 @@ Player::Player(string type, int player_number, int hand_count, int foot_count,
 bool Player::attack(Player &other_player, string my_stats, string other_stats) {
     Extremity *other_ex = other_player.get_ex(other_stats);
     Extremity *my_ex = this->get_ex(my_stats);
-    if (other_ex == nullptr || my_ex == nullptr) return false;
-    if (my_ex->get_count() == 0) {
-        outputTo(output, "A free hand or foot cannot attack!");
+    if (my_ex == nullptr) {
+        outputTo(output, "Your chosen " + (string)(my_stats[0] == 'H' ? "hand" : "foot") + " is out of bounds.");
+        return false;
+    } else if (other_ex == nullptr) {
+        outputTo(output, "Chosen target " + (string)(other_stats[0] == 'H' ? "hand" : "foot") + " is out of bounds.");
         return false;
     }
-    if (!my_ex->tap(*other_ex)) return false;
+    if (!my_ex->is_alive()) {
+        outputTo(output, "Your chosen " + my_ex->get_type() + " is dead.");
+        return false;
+    } else if (!other_ex->is_alive()) {
+        outputTo(output, "Chosen target " + other_ex->get_type() + " is already dead.");
+        return false;
+    }
+    if (my_ex->get_count() == 0) {
+        outputTo(output, "Your free " + my_ex->get_type() + " cannot attack!");
+        return false;
+    }
+    if (!my_ex->tap(*other_ex)) {
+        outputTo(output, "Tap error.");
+        return false;
+    }
     if (other_ex->get_type() == "foot" && !other_ex->is_alive()) {
         other_player.skip_turn();
     }
@@ -184,13 +178,9 @@ bool Player::attack(Player &other_player, string my_stats, string other_stats) {
 bool Player::distribute(string mode, vector<int> change) {
     vector<Extremity *> extr;
     if (mode == "hands") {
-        for (auto &hand : hands) {
-            extr.push_back(&hand);
-        }
+        extr = hands;
     } else if (mode == "feet") {
-        for (auto &foot : feet) {
-            extr.push_back(&foot);
-        }
+        extr = feet;
     } else {
         return false;
     }
@@ -211,7 +201,7 @@ bool Player::distribute(string mode, vector<int> change) {
         extremeties_sum += extr[i]->get_count();
     }
     if (change_sum != extremeties_sum) {
-        outputTo(output, "Distribution sum are not equal."); //disthands a a occurs
+        outputTo(output, "Distribution sum are not equal.");
         return false;
     }
     // modify
@@ -242,32 +232,62 @@ bool Player::check_skip(bool modify_skip) {
 void Player::attacked_by(Player &other, Extremity &other_ex,
                          Extremity &my_ex) {
     alive = false;
-    for (Hand &ex : hands) {
-        if (ex.is_alive()) {
+    for (Extremity *&ex : hands) {
+        if (ex->is_alive()) {
             alive = true;
             return;
         }
     }
-    for (Foot &ex : feet) {
-        if (ex.is_alive()) {
+    for (Extremity *&ex : feet) {
+        if (ex->is_alive()) {
             alive = true;
             return;
         }
     }
 }
 
-//finds out if player can attack
-bool Player::check_for_free_extremeties(){
-    vector<Hand> hands_alive = this->get_alive_hands();
-    vector<Foot> feet_alive = this->get_alive_feet();
-    int free_hands = 0;
-    int free_feet = 0;
-    for (auto &hand: hands_alive){
-        if (hand.get_count() == 0) ++free_hands;
+vector<Extremity *> Player::get_alive_extremities(string mode) {
+    vector<Extremity *> alive_extremities;
+    if (mode == "hands") {
+        alive_extremities = hands;
+    } else if (mode == "feet") {
+        alive_extremities = feet;
+    }
+    for (auto &extremity : alive_extremities) {
+        if (extremity->is_alive()) {
+            alive_extremities.push_back(extremity);
+        }
+    }
+    return alive_extremities;
+}
+
+int const Player::get_extremities_count(string mode, bool only_alive) {
+    vector<Extremity *> *extremities;
+    if (mode == "hands") {
+        extremities = &hands;
+    } else if (mode == "feet") {
+        extremities = &feet;
+    }
+    if (!only_alive) return extremities->size();
+    int count = 0;
+    for (auto &extremity : *extremities) {
+        if (extremity->is_alive()) ++count;
+    }
+    return count;
+}
+
+/* finds out if player can attack */
+bool Player::check_for_free_extremeties() {
+    vector<Extremity *> hands_alive = this->get_alive_extremities("hands");
+    vector<Extremity *> feet_alive = this->get_alive_extremities("feet");
+    size_t free_hands = 0;
+    size_t free_feet = 0;
+    for (auto &hand : hands_alive) {
+        if (hand->get_count() == 0) ++free_hands;
     }
 
-    for (auto &foot: feet_alive){
-        if (foot.get_count() == 0) ++free_feet;
+    for (auto &foot : feet_alive) {
+        if (foot->get_count() == 0) ++free_feet;
     }
 
     if (free_hands == hands_alive.size() && free_feet == feet_alive.size()) {
@@ -281,9 +301,9 @@ Extremity *Player::get_ex(string mode) {
     if (mode.size() != 2) return nullptr;
     unsigned int index = (unsigned int)mode[1] - (unsigned int)'A';
     if (mode[0] == 'H' && 0 <= index && index < hands.size()) {
-        return &hands[index];
+        return hands[index];
     } else if (mode[0] == 'F' && 0 <= index && index < feet.size()) {
-        return &feet[index];
+        return feet[index];
     }
     return nullptr;
 }
@@ -291,17 +311,17 @@ Extremity *Player::get_ex(string mode) {
 string Player::get_status() {
     string result = "P" + to_string(player_number) + type[0] + " (";
 
-    if (!alive){
+    if (!alive) {
         result.pop_back();
         result += "[dead]";
         return result;
     }
     for (auto &hand : hands) {
-        result += hand.get_status();
+        result += hand->get_status();
     }
     result += ":";
     for (auto &foot : feet) {
-        result += foot.get_status();
+        result += foot->get_status();
     }
     result += ") [" + to_string(max_fingers) + ":" + to_string(max_toes) + "]";
     if (skip)
@@ -316,16 +336,15 @@ string Player::get_status() {
 string Player::play_with(vector<Player *> &all_players) {
     string action_made;
     bool valid_action = false;
-    while (!valid_action){
+    while (!valid_action) {
         string action, line_string;
-        outputTo(output, "Enter your move.");
+        outputTo(output, "Enter your move. [tap | disthands | distfeet]");
         line_string = getlineFrom(input, output);
         istringstream line(line_string);
         line >> action;
 
         if (action == "tap") {
-            bool valid = is_valid_string(line_string,4);
-            if (!valid){
+            if (!is_valid_string(line_string, 4)) {
                 outputTo(output, "Please enter a valid number of arguments.");
                 continue;
             }
@@ -333,10 +352,9 @@ string Player::play_with(vector<Player *> &all_players) {
             unsigned int player_number;
             line >> from >> player_num_arg >> to;
 
-            if (from.size() != 2 || to.size() != 2){
+            if (from.size() != 2 || to.size() != 2 || (from[0] != 'H' && from[0] != 'F') || (to[0] != 'H' && to[0] != 'F')) {
                 outputTo(output, "Please enter valid attack arguments");
                 continue;
-
             }
             if (is_valid_int(player_num_arg)) {
                 player_number = stoi(player_num_arg);
@@ -357,44 +375,29 @@ string Player::play_with(vector<Player *> &all_players) {
                 outputTo(output, "Friendly fire is not allowed! Enter action again.");
                 continue;
             }
-            if (!attack(*target, from, to)) {
-                outputTo(output, "Attack invalid! Enter action again.");
-                continue;
-            }
+            if (!attack(*target, from, to)) continue;
+
         } else if (action == "disthands" || action == "distfeet") {
-            if ((action == "disthands" ? get_hands_count(true) : get_feet_count(true)) <= 1) {
-                outputTo(output, "Unable to redistribute.");
-                continue;
-            }
-
-            bool valid = true;
-            if (action == "disthands"){
-                valid = is_valid_string(line_string,get_hands_count(true)+1); //+1 for "disthands" keyword
-            } else if (action == "distfeet"){
-                valid = is_valid_string(line_string,get_feet_count(true)+1); //+1 for "distfeet" keyword
-            }
-
-            if (!valid){
+            int alive_hands_count = get_extremities_count("hands", true);
+            int alive_feet_count = get_extremities_count("feet", true);
+            if (!is_valid_string(line_string, (action == "disthands" ? alive_hands_count : alive_feet_count) + 1)) {
                 outputTo(output, "Please enter a valid number of arguments.");
                 continue;
             }
+            if ((action == "disthands" ? alive_hands_count : alive_feet_count) <= 1) {
+                outputTo(output, "Unable to redistribute with only 1 alive " + (string)(action == "disthands" ? "hand" : "foot") + ".");
+                continue;
+            }
 
-            vector<int> changes(action == "disthands" ? get_hands_count() : get_feet_count());
-            
+            vector<int> changes(action == "disthands" ? get_extremities_count("hands") : get_extremities_count("feet"));
+            vector<Extremity *> *extremities = action == "disthands" ? &hands : &feet;
+
             bool is_valid = true;
             for (size_t i = 0; i < changes.size(); ++i) {
-                string to_check = "";
-                if (action == "disthands" && hands[i].is_alive()) {
+                string to_check;
+                if (extremities->at(i)->is_alive()) {
                     line >> to_check;
-                    if (!is_valid_int(to_check)){
-                        is_valid = false;
-                        break;
-                    }
-                    changes[i] = stoi(to_check);
-                    
-                } else if (action == "distfeet" && feet[i].is_alive()) {
-                    line >> to_check;
-                    if (!is_valid_int(to_check)){
+                    if (!is_valid_int(to_check)) {
                         is_valid = false;
                         break;
                     }
@@ -402,23 +405,19 @@ string Player::play_with(vector<Player *> &all_players) {
                 }
             }
 
-            if (!is_valid){
-                outputTo(output, "Please enter an integer.");
+            if (!is_valid) {
+                outputTo(output, "Please enter integer arguments only after " + action + ".");
                 continue;
             }
 
-            if (!distribute(action == "disthands" ? "hands" : "feet", changes)) {
-                // outputTo(output, "Invalid distribution! Enter action again.");
-                continue;
-            }
+            if (!distribute(action == "disthands" ? "hands" : "feet", changes)) continue;
+
         } else {
             outputTo(output, "Invalid keyword! Try again.");
             continue;
         }
         action_made = line_string;
         valid_action = true;
-
-
     }
     return action_made;
 }
@@ -444,7 +443,7 @@ class Zombie : public Player {
         : Player("zombie", player_number, 1, 0, 4, 0, output, input, 2) {}
     void attacked_by(Player &other, Extremity &other_ex, Extremity &my_ex) override {
         if (hands.size() == 1 && !my_ex.is_alive()) {  // starting hand dies
-            Hand new_hand(4);
+            Hand *new_hand = new Hand(4);
             hands.push_back(new_hand);
         }
         Player::attacked_by(other, other_ex, my_ex);
@@ -471,18 +470,16 @@ class Team {
     vector<Player *> players;
     int current_player_index;
     Player *current_player;
-    
+
    public:
     Team(int team_number, vector<ostream *> outputs = {});
     int get_team_number() { return team_number; }
     bool is_alive();
     int get_players_alive_count();
-    bool play_with(vector<Player *> &all_players);
     void add_player(Player *new_player);
     string get_status();
     Player *get_next_available_player(bool inplace = false, bool output_status = false);
-    Player *get_current_player() { return current_player;}
-
+    Player *get_current_player() { return current_player; }
 };
 
 Team::Team(int team_number, vector<ostream *> outputs) : team_number(team_number), outputs(outputs), current_player_index(0), current_player(nullptr) {
@@ -505,29 +502,6 @@ int Team::get_players_alive_count() {
         }
     }
     return result;
-}
-
-/* @return true if team can play else false */
-bool Team::play_with(vector<Player *> &all_players) {
-    if (!is_alive()) {
-        return false;
-    }
-
-    if (get_next_available_player(true, true) == nullptr) {
-        outputToAll(outputs, "Team " + to_string(team_number) + " has been skipped.");
-        return false;
-    }
-    int player_index = current_player->get_player_number() - 1;
-    outputToAll(outputs, "Waiting for player " + to_string(player_index + 1) + " from team " + to_string(team_number) + ".", outputs[player_index]);
-    vector<string> actions_made;
-    for (int i = 0; i < current_player->get_turns(); ++i){
-        actions_made.push_back(current_player->play_with(all_players));
-    }
-    outputToAll(outputs, "Player " + to_string(player_index + 1) + " actions:", outputs[player_index]);
-    for (auto &&action : actions_made) {
-        outputToAll(outputs, "=> " + action, outputs[player_index]);
-    }
-    return true;
 }
 
 void Team::add_player(Player *new_player) {

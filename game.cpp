@@ -13,7 +13,7 @@ void runServer(string port) {
     for (;;) {
         string players_argument;
         cout << "How many players are there?" << endl;
-        getline(cin,players_argument);
+        getline(cin, players_argument);
         if (is_valid_int(players_argument)) {
             player_count = stoi(players_argument);
             if (2 <= player_count && player_count <= 6) {
@@ -64,8 +64,13 @@ void runServer(string port) {
         outputTo(outputs[i], "Choose 1: Human || Alien || Zombie || Doggo");
 
         string type = getlineFrom(inputs[i], outputs[i]);
-        //istringstream line(type);
-        //line >> type;
+        if (!is_valid_string(type, 1)) {
+            outputTo(outputs[i], "Enter only one keyword.");
+            --i;
+            continue;
+        }
+        istringstream line(type);
+        line >> type;
 
         Player *new_player;
         if (type == "Human" || type == "human") {
@@ -153,66 +158,58 @@ void runServer(string port) {
     outputToAll(outputs);
 
     // actual game
-    int current_team_index = 0;
     Team *winning_team = nullptr;
     // output initial game status
     for (Team &team : teams) {
         outputToAll(outputs, team.get_status());
     }
     outputToAll(outputs);
-    for (int teams_alive = 0; teams_alive != 1;) {
-        bool played = true;
-        //teams[current_team_index].play_with(players);
-
+    for (int teams_alive = 0, current_team_index = 0; teams_alive != 1; current_team_index = (current_team_index + 1) % teams.size()) {
         if (!teams[current_team_index].is_alive()) {
-            played = false;
+            continue;
         }
 
         if (teams[current_team_index].get_next_available_player(true, true) == nullptr) {
             outputToAll(outputs, "Team " + to_string(teams[current_team_index].get_team_number()) + " has been skipped.");
-            played = false;
+            continue;
         }
 
-        if (played){
-            int player_index = teams[current_team_index].get_current_player()->get_player_number() - 1;
-            outputToAll(outputs, "Waiting for player " + to_string(player_index + 1) + " from team " + to_string(teams[current_team_index].get_team_number()) + ".", outputs[player_index]);
-            
-            vector<string> actions_made;
-            for (int i = 0; i < teams[current_team_index].get_current_player()->get_turns(); ++i){
-                actions_made.push_back(teams[current_team_index].get_current_player()->play_with(players));
+        int player_index = teams[current_team_index].get_current_player()->get_player_number() - 1;
+        outputToAll(outputs, "Waiting for player " + to_string(player_index + 1) + " from team " + to_string(teams[current_team_index].get_team_number()) + ".", outputs[player_index]);
 
-                // check win
-                teams_alive = 0;
-                for (auto &team : teams) {
-                    if (team.is_alive()) {
-                        ++teams_alive;
-                        winning_team = &team;
-                    }
-                    if (teams_alive >= 2) {
-                        break;
-                    }
+        vector<string> actions_made;
+        for (int i = 0; i < teams[current_team_index].get_current_player()->get_turns(); ++i) {
+            // player move
+            actions_made.push_back(teams[current_team_index].get_current_player()->play_with(players));
+
+            // check win
+            teams_alive = 0;
+            for (auto &team : teams) {
+                if (team.is_alive()) {
+                    ++teams_alive;
+                    winning_team = &team;
                 }
-
-                if (teams_alive == 1){
+                if (teams_alive >= 2) {
                     break;
                 }
             }
+            if (teams_alive == 1) {
+                break;
+            }
+        }
 
-            outputToAll(outputs, "Player " + to_string(player_index + 1) + " actions:", outputs[player_index]);
-            for (auto &&action : actions_made) {
-                outputToAll(outputs, "=> " + action, outputs[player_index]);
-            }
+        // broadcast moves made
+        outputToAll(outputs, "Player " + to_string(player_index + 1) + " actions:", outputs[player_index]);
+        for (auto &&action : actions_made) {
+            outputToAll(outputs, "=> " + action, outputs[player_index]);
         }
-        // next
-        current_team_index = (current_team_index + 1) % teams.size();
-        
+        outputToAll(outputs);
+
         // output game status
-        if (played) {
-            for (Team &team : teams) {
-                outputToAll(outputs, team.get_status());
-            }
-            outputToAll(outputs);
+        for (Team &team : teams) {
+            outputToAll(outputs, team.get_status());
         }
+        outputToAll(outputs);
     }
     // game conclusion
     int winning_team_number = winning_team->get_team_number();
