@@ -321,7 +321,7 @@ vector<string> Player::play_with(vector<Player *> &all_players) {
             for (size_t i = 0; i < changes.size(); ++i) {
                 if (action == "disthands" && hands[i].is_alive()) {
                     line >> changes[i];
-                } else if (feet[i].is_alive()) {
+                } else if (action == "distfeet" && feet[i].is_alive()) {
                     line >> changes[i];
                 }
             }
