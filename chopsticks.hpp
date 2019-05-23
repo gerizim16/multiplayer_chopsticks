@@ -271,9 +271,9 @@ bool Player::check_for_free_extremeties(){
     }
 
     if (free_hands == hands_alive.size() && free_feet == feet_alive.size()) {
-        return true;
+        return false;
     }
-    return false;
+    return true;
 }
 
 /* @return valid pointer if valid parameter and in bounds else std::nullptr */
@@ -456,7 +456,6 @@ class Team {
     bool play_with(vector<Player *> &all_players);
     void add_player(Player *new_player);
     string get_status();
-    bool check_for_free_extremeties();
     Player *get_next_available_player(bool inplace = false, bool output_status = false);
     Player *get_current_player() { return current_player;}
 
@@ -536,7 +535,7 @@ Player *Team::get_next_available_player(bool modify, bool output_status) {
 
     do {  // while not returning back to first check player
         if (next_player->is_alive()) {
-            if (next_player->check_skip(modify) || next_player->check_for_free_extremeties()) {
+            if (next_player->check_skip(modify) || !next_player->check_for_free_extremeties()) {
                 if (output_status) outputToAll(outputs, "Player " + to_string(next_player->get_player_number()) + " has been skipped.");
                 ++players_skipped;
             } else {
