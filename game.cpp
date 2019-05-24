@@ -1,3 +1,4 @@
+#include <fstream>
 #include <iostream>
 #include <string>
 #include <typeinfo>
@@ -48,7 +49,39 @@ void runServer(string port) {
     outputToAll(outputs);
 
     // ready
-    outputToAll(outputs, "Chopsticks will now commence!");
+    ifstream banner("banner.txt");
+    if (banner.is_open()) {
+        string line;
+        while (getline(banner, line)) {
+            outputToAll(outputs, line);
+        }
+        outputToAll(outputs);
+        banner.close();
+    } else {
+        outputToAll(outputs, "Chopsticks will now commence!");
+    }
+
+    // show mechanics
+    outputToAll(outputs, "Please wait...");
+    for (int i = 0; i < player_count; ++i) {
+        outputTo(outputs[i], "Show mechanics? (y/n) default: n");
+        istringstream strm(getlineFrom(inputs[i], outputs[i]));
+        string answer;
+        strm >> answer;
+        if (answer == "y" || answer == "Y") {
+            ifstream rules("rules.txt");
+            if (rules.is_open()) {
+                string line;
+                while (getline(rules, line)) {
+                    outputTo(outputs[i], line);
+                }
+                outputTo(outputs[i]);
+                rules.close();
+            }
+        }
+        outputTo(outputs[i], "Please wait...");
+    }
+
     for (int i = 0; i < player_count; ++i) {
         string line = "You are player " + to_string(i + 1);
         outputTo(outputs[i], line);
@@ -73,13 +106,13 @@ void runServer(string port) {
         line >> type;
 
         Player *new_player;
-        if (type == "Human" || type == "human") {
+        if (type == "Human" || type == "human" || type == "1") {
             new_player = new Human(i + 1, outputs[i], inputs[i]);
-        } else if (type == "Alien" || type == "alien") {
+        } else if (type == "Alien" || type == "alien"|| type == "2") {
             new_player = new Alien(i + 1, outputs[i], inputs[i]);
-        } else if (type == "Zombie" || type == "zombie") {
+        } else if (type == "Zombie" || type == "zombie"|| type == "3") {
             new_player = new Zombie(i + 1, outputs[i], inputs[i]);
-        } else if (type == "Doggo" || type == "doggo") {
+        } else if (type == "Doggo" || type == "doggo"|| type == "4") {
             new_player = new Doggo(i + 1, outputs[i], inputs[i]);
         } else {
             outputTo(outputs[i], "Invalid keyword! Try again.");
@@ -159,24 +192,24 @@ void runServer(string port) {
 
     // actual game
     Team *winning_team = nullptr;
-    // output initial game status
-    for (Team &team : teams) {
-        outputToAll(outputs, team.get_status());
-    }
-    outputToAll(outputs);
-    for (int teams_alive = 0, current_team_index = 0; teams_alive != 1; current_team_index = (current_team_index + 1) % teams.size()) {
-        if (!teams[current_team_index].is_alive()) {
-            continue;
+    for (unsigned int teams_alive = 0, current_team_index = 0; teams_alive != 1; current_team_index = (current_team_index + 1) % teams.size()) {
+        if (!teams[current_team_index].is_alive()) continue;
+        // output game status
+        for (size_t i = 0; i < teams.size(); ++i) {
+            outputToAll(outputs, (i == current_team_index ? '>' : ' ') + teams[i].get_status());
         }
+        outputToAll(outputs);
 
+        // check team skip
         if (teams[current_team_index].get_next_available_player(true, true) == nullptr) {
             outputToAll(outputs, "Team " + to_string(teams[current_team_index].get_team_number()) + " has been skipped.");
+            outputToAll(outputs);
             continue;
         }
 
+        // do turn
         int player_index = teams[current_team_index].get_current_player()->get_player_number() - 1;
         outputToAll(outputs, "Waiting for player " + to_string(player_index + 1) + " from team " + to_string(teams[current_team_index].get_team_number()) + ".", outputs[player_index]);
-
         vector<string> actions_made;
         for (int i = 0; i < teams[current_team_index].get_current_player()->get_turns(); ++i) {
             // player move
@@ -204,13 +237,12 @@ void runServer(string port) {
             outputToAll(outputs, "=> " + action, outputs[player_index]);
         }
         outputToAll(outputs);
-
-        // output game status
-        for (Team &team : teams) {
-            outputToAll(outputs, team.get_status());
-        }
-        outputToAll(outputs);
     }
+    // output final game status
+    for (auto &team : teams) {
+        outputToAll(outputs, team.get_status());
+    }
+    outputToAll(outputs);
     // game conclusion
     int winning_team_number = winning_team->get_team_number();
     for (int i = 0; i < player_count; ++i) {
@@ -230,7 +262,7 @@ void runServer(string port) {
         delete player_ptr;
     }
     listeningSocket.close();
-    cout << "Connections closed.";
+    cout << "Connections closed." << endl;
 }
 
 /* generic client, no logic */

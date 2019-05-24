@@ -338,7 +338,7 @@ string Player::play_with(vector<Player *> &all_players) {
     bool valid_action = false;
     while (!valid_action) {
         string action, line_string;
-        outputTo(output, "Enter your move. [tap | disthands | distfeet]");
+        outputTo(output, "Player " + to_string(get_player_number()) + ", enter your move. [tap | disthands | distfeet]");
         line_string = getlineFrom(input, output);
         istringstream line(line_string);
         line >> action;
@@ -497,9 +497,7 @@ bool Team::is_alive() {
 int Team::get_players_alive_count() {
     int result = 0;
     for (auto &player : players) {
-        if (player->is_alive()) {
-            ++result;
-        }
+        if (player->is_alive()) ++result;
     }
     return result;
 }
@@ -558,7 +556,7 @@ string Team::get_status() {
     int next_player_index = 0;
     Player *next = get_next_available_player();
     if (next != nullptr) next_player_index = next->get_player_number();
-    string result = "Team " + to_string(team_number) + ": ";
+    string result = "Team " + to_string(team_number) + " | ";
     for (size_t i = 0; i < players.size(); ++i) {
         if (next_player_index == players[i]->get_player_number()) result += ">>";
         result += players[i]->get_status();
