@@ -113,7 +113,7 @@ class Player {
     bool distribute(string mode, vector<int> change);
     virtual void skip_turn(bool force = false) { skip = true; }
     bool check_skip(bool modify_skip = false);
-    bool check_for_free_extremeties();
+    bool can_make_an_action();
     string get_status();
     string play_with(vector<Player *> &all_players);
 };
@@ -247,13 +247,14 @@ void Player::attacked_by(Player &other, Extremity &other_ex,
 }
 
 vector<Extremity *> Player::get_alive_extremities(string mode) {
-    vector<Extremity *> alive_extremities;
+    vector<Extremity *> *extremities;
     if (mode == "hands") {
-        alive_extremities = hands;
+        extremities = &hands;
     } else if (mode == "feet") {
-        alive_extremities = feet;
+        extremities = &feet;
     }
-    for (auto &extremity : alive_extremities) {
+    vector<Extremity *> alive_extremities;
+    for (auto &extremity : *extremities) {
         if (extremity->is_alive()) {
             alive_extremities.push_back(extremity);
         }
@@ -276,8 +277,8 @@ int const Player::get_extremities_count(string mode, bool only_alive) {
     return count;
 }
 
-/* finds out if player can attack */
-bool Player::check_for_free_extremeties() {
+/* finds out if player can do any action */
+bool Player::can_make_an_action() {
     vector<Extremity *> hands_alive = this->get_alive_extremities("hands");
     vector<Extremity *> feet_alive = this->get_alive_extremities("feet");
     size_t free_hands = 0;
@@ -477,8 +478,9 @@ class Team {
     bool is_alive();
     int get_players_alive_count();
     void add_player(Player *new_player);
-    string get_status();
+    string get_status(bool current_turn = false);
     Player *get_next_available_player(bool inplace = false, bool output_status = false);
+    Player *get_next_player();
     Player *get_current_player() { return current_player; }
 };
 
@@ -531,8 +533,11 @@ Player *Team::get_next_available_player(bool modify, bool output_status) {
 
     do {  // while not returning back to first check player
         if (next_player->is_alive()) {
-            if (next_player->check_skip(modify) || !next_player->check_for_free_extremeties()) {
+            if (next_player->check_skip(modify)) {
                 if (output_status) outputToAll(outputs, "Player " + to_string(next_player->get_player_number()) + " has been skipped.");
+                ++players_skipped;
+            } else if (!next_player->can_make_an_action()) {
+                if (output_status) outputToAll(outputs, "Player " + to_string(next_player->get_player_number()) + " cannot do any action.");
                 ++players_skipped;
             } else {
                 break;
@@ -552,22 +557,27 @@ Player *Team::get_next_available_player(bool modify, bool output_status) {
     return next_player;
 }
 
-string Team::get_status() {
-    int next_player_index = 0;
-    Player *next = get_next_available_player();
-    if (next != nullptr) next_player_index = next->get_player_number();
+Player *Team::get_next_player() {
+    // if first turn
+    if (current_player == nullptr) return players[0];
+    return players[(current_player_index + 1) % players.size()];
+}
+
+string Team::get_status(bool current_turn) {
+    int player_number = current_turn ? current_player->get_player_number() : get_next_player()->get_player_number();
     string result = "Team " + to_string(team_number) + " | ";
     for (size_t i = 0; i < players.size(); ++i) {
-        if (next_player_index == players[i]->get_player_number()) result += ">>";
+        if (player_number == players[i]->get_player_number()) result += ">>";
         result += players[i]->get_status();
-        if (next_player_index == players[i]->get_player_number()) result += "<<";
+        if (player_number == players[i]->get_player_number()) result += "<<";
         result += " | ";
     }
-
-    if (!is_alive())
+    if (current_turn) return result;
+    if (!is_alive()) {
         result += "Team is dead.";
-    else if (next == nullptr)
+    } else if (get_next_available_player() == nullptr) {
         result += "Team will be skipped.";
+    }
     return result;
 }
 

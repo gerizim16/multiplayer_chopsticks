@@ -108,11 +108,11 @@ void runServer(string port) {
         Player *new_player;
         if (type == "Human" || type == "human" || type == "1") {
             new_player = new Human(i + 1, outputs[i], inputs[i]);
-        } else if (type == "Alien" || type == "alien"|| type == "2") {
+        } else if (type == "Alien" || type == "alien" || type == "2") {
             new_player = new Alien(i + 1, outputs[i], inputs[i]);
-        } else if (type == "Zombie" || type == "zombie"|| type == "3") {
+        } else if (type == "Zombie" || type == "zombie" || type == "3") {
             new_player = new Zombie(i + 1, outputs[i], inputs[i]);
-        } else if (type == "Doggo" || type == "doggo"|| type == "4") {
+        } else if (type == "Doggo" || type == "doggo" || type == "4") {
             new_player = new Doggo(i + 1, outputs[i], inputs[i]);
         } else {
             outputTo(outputs[i], "Invalid keyword! Try again.");
@@ -200,11 +200,25 @@ void runServer(string port) {
         }
         outputToAll(outputs);
 
-        // check team skip
-        if (teams[current_team_index].get_next_available_player(true, true) == nullptr) {
-            outputToAll(outputs, "Team " + to_string(teams[current_team_index].get_team_number()) + " has been skipped.");
-            outputToAll(outputs);
-            continue;
+        // check team and player skips
+        Player *supposed_next_player = teams[current_team_index].get_next_player();
+        Player *next_available_player = teams[current_team_index].get_next_available_player(true, true);
+        if (supposed_next_player != next_available_player) {  // a skip happened
+            if (next_available_player == nullptr) {           // whole team skipped
+                outputToAll(outputs, "Team " + to_string(teams[current_team_index].get_team_number()) + " has been skipped.");
+                outputToAll(outputs);
+                continue;
+            } else {  // only a player was skipped, reoutput game status
+                outputToAll(outputs);
+                for (size_t i = 0; i < teams.size(); ++i) {
+                    if (i == current_team_index) {
+                        outputToAll(outputs, '>' + teams[i].get_status(true));
+                    } else {
+                        outputToAll(outputs, ' ' + teams[i].get_status());
+                    }
+                }
+                outputToAll(outputs);
+            }
         }
 
         // do turn
@@ -214,7 +228,6 @@ void runServer(string port) {
         for (int i = 0; i < teams[current_team_index].get_current_player()->get_turns(); ++i) {
             // player move
             actions_made.push_back(teams[current_team_index].get_current_player()->play_with(players));
-
             // check win
             teams_alive = 0;
             for (auto &team : teams) {
@@ -222,13 +235,9 @@ void runServer(string port) {
                     ++teams_alive;
                     winning_team = &team;
                 }
-                if (teams_alive >= 2) {
-                    break;
-                }
+                if (teams_alive >= 2) break;
             }
-            if (teams_alive == 1) {
-                break;
-            }
+            if (teams_alive == 1) break;
         }
 
         // broadcast moves made
