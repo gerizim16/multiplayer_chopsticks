@@ -31,4 +31,9 @@
 *.out
 *.app
 
+# IDE files
 .vscode
+
+# other files
+*.docx
+*.pdf
