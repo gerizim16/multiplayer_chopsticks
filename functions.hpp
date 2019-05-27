@@ -7,9 +7,9 @@
 #include <vector>
 #include <sstream>
 
-const int CLIENT_END = -1;
-const int CLIENT_OUTPUT = 0;
-const int CLIENT_INPUT = 1;
+enum ClientActions { CLIENT_END,
+                     CLIENT_OUTPUT,
+                     CLIENT_INPUT };
 
 /* don't include \n in output */
 void outputTo(std::ostream *output, std::string line = "") {

@@ -126,7 +126,7 @@ void runServer(string port) {
 
     // output class types
     for (int i = 0; i < player_count; ++i) {
-        outputTo(outputs[i], "You are of type " + players[i]->get_type());
+        outputTo(outputs[i], "You are of type " + players[i]->getName());
         outputTo(outputs[i]);
     }
 
@@ -180,41 +180,41 @@ void runServer(string port) {
             teams.push_back(new_team);
         }
         for (int i = 0; i < player_count; ++i) {
-            players[i]->set_team_number(group_numbers[i]);
-            teams[group_numbers[i] - 1].add_player(players[i]);
+            players[i]->setTeamNumber(group_numbers[i]);
+            teams[group_numbers[i] - 1].addPlayer(players[i]);
         }
     }
     outputToAll(outputs, "Grouping successful!");
     for (int i = 0; i < player_count; ++i) {
-        outputTo(outputs[i], "You are in group " + to_string(players[i]->get_team_number()) + ".");
+        outputTo(outputs[i], "You are in group " + to_string(players[i]->getTeamNumber()) + ".");
     }
     outputToAll(outputs);
 
     // actual game
     Team *winning_team = nullptr;
     for (unsigned int teams_alive = 0, current_team_index = 0; teams_alive != 1; current_team_index = (current_team_index + 1) % teams.size()) {
-        if (!teams[current_team_index].is_alive()) continue;
+        if (!teams[current_team_index].isAlive()) continue;
         // output game status
         for (size_t i = 0; i < teams.size(); ++i) {
-            outputToAll(outputs, (i == current_team_index ? '>' : ' ') + teams[i].get_status());
+            outputToAll(outputs, (i == current_team_index ? '>' : ' ') + teams[i].getStatus());
         }
         outputToAll(outputs);
 
         // check team and player skips
-        Player *supposed_next_player = teams[current_team_index].get_next_player();
-        Player *next_available_player = teams[current_team_index].get_next_available_player(true, true);
+        Player *supposed_next_player = teams[current_team_index].getNextPlayer();
+        Player *next_available_player = teams[current_team_index].getNextAvailablePlayer(true, true);
         if (supposed_next_player != next_available_player) {  // a skip happened
             if (next_available_player == nullptr) {           // whole team skipped
-                outputToAll(outputs, "Team " + to_string(teams[current_team_index].get_team_number()) + " has been skipped.");
+                outputToAll(outputs, "Team " + to_string(teams[current_team_index].getTeamNumber()) + " has been skipped.");
                 outputToAll(outputs);
                 continue;
             } else {  // only a player was skipped, reoutput game status
                 outputToAll(outputs);
                 for (size_t i = 0; i < teams.size(); ++i) {
                     if (i == current_team_index) {
-                        outputToAll(outputs, '>' + teams[i].get_status(true));
+                        outputToAll(outputs, '>' + teams[i].getStatus(true));
                     } else {
-                        outputToAll(outputs, ' ' + teams[i].get_status());
+                        outputToAll(outputs, ' ' + teams[i].getStatus());
                     }
                 }
                 outputToAll(outputs);
@@ -222,16 +222,16 @@ void runServer(string port) {
         }
 
         // do turn
-        int player_index = teams[current_team_index].get_current_player()->get_player_number() - 1;
-        outputToAll(outputs, "Waiting for player " + to_string(player_index + 1) + " from team " + to_string(teams[current_team_index].get_team_number()) + ".", outputs[player_index]);
+        int player_index = teams[current_team_index].getCurrentPlayer()->getPlayerNumber() - 1;
+        outputToAll(outputs, "Waiting for player " + to_string(player_index + 1) + " from team " + to_string(teams[current_team_index].getTeamNumber()) + ".", outputs[player_index]);
         vector<string> actions_made;
-        for (int i = 0; i < teams[current_team_index].get_current_player()->get_turns(); ++i) {
+        for (int i = 0; i < teams[current_team_index].getCurrentPlayer()->getTurns(); ++i) {
             // player move
-            actions_made.push_back(teams[current_team_index].get_current_player()->play_with(players));
+            actions_made.push_back(teams[current_team_index].getCurrentPlayer()->playWith(players));
             // check win
             teams_alive = 0;
             for (auto &team : teams) {
-                if (team.is_alive()) {
+                if (team.isAlive()) {
                     ++teams_alive;
                     winning_team = &team;
                 }
@@ -249,13 +249,13 @@ void runServer(string port) {
     }
     // output final game status
     for (auto &team : teams) {
-        outputToAll(outputs, team.get_status());
+        outputToAll(outputs, team.getStatus());
     }
     outputToAll(outputs);
     // game conclusion
-    int winning_team_number = winning_team->get_team_number();
+    int winning_team_number = winning_team->getTeamNumber();
     for (int i = 0; i < player_count; ++i) {
-        if (players[i]->get_team_number() == winning_team_number) {
+        if (players[i]->getTeamNumber() == winning_team_number) {
             outputTo(outputs[i], "Congratulations! Team " + to_string(winning_team_number) + " wins!");
         } else {
             outputTo(outputs[i], "You lose. Team " + to_string(winning_team_number) + " wins!");
@@ -309,18 +309,18 @@ int main(int argc, char *argv[]) {
     // check port validity
     if (!(argc == 2 || argc == 3)) {
         cerr << "Invalid argument count." << endl;
-        return 1;
+        return 0;
     }
     int port_index = argc - 1;
     if (is_valid_int(argv[port_index])) {
         int port = stoi(argv[port_index]);
         if (!(1024 <= port && port <= 65535)) {
             cerr << "Port must be from 1024 to 65535 only." << endl;
-            return 2;
+            return 0;
         }
     } else {
         cerr << "Port must be an integer." << endl;
-        return 3;
+        return 0;
     }
     // run
     if (argc == 2) {
