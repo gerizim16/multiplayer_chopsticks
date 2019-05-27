@@ -176,7 +176,7 @@ void runServer(string port) {
         }
         // valid grouping, build teams
         for (int i = 1; i <= team_count; ++i) {
-            Team new_team(i, outputs);
+            Team new_team(i);
             teams.push_back(new_team);
         }
         for (int i = 0; i < player_count; ++i) {
@@ -193,41 +193,53 @@ void runServer(string port) {
     // actual game
     Team *winning_team = nullptr;
     for (unsigned int teams_alive = 0, current_team_index = 0; teams_alive != 1; current_team_index = (current_team_index + 1) % teams.size()) {
-        if (!teams[current_team_index].isAlive()) continue;
+        Team *current_team = &teams[current_team_index];
+        if (!current_team->isAlive()) continue;
         // output game status
         for (size_t i = 0; i < teams.size(); ++i) {
             outputToAll(outputs, (i == current_team_index ? '>' : ' ') + teams[i].getStatus());
         }
         outputToAll(outputs);
 
-        // check team and player skips
-        Player *supposed_next_player = teams[current_team_index].getNextPlayer();
-        Player *next_available_player = teams[current_team_index].getNextAvailablePlayer(true, true);
-        if (supposed_next_player != next_available_player) {  // a skip happened
-            if (next_available_player == nullptr) {           // whole team skipped
-                outputToAll(outputs, "Team " + to_string(teams[current_team_index].getTeamNumber()) + " has been skipped.");
-                outputToAll(outputs);
-                continue;
-            } else {  // only a player was skipped, reoutput game status
-                outputToAll(outputs);
-                for (size_t i = 0; i < teams.size(); ++i) {
-                    if (i == current_team_index) {
-                        outputToAll(outputs, '>' + teams[i].getStatus(true));
-                    } else {
-                        outputToAll(outputs, ' ' + teams[i].getStatus());
-                    }
-                }
-                outputToAll(outputs);
+        if (current_team->isSkipping()) {
+            current_team->skip();
+            outputToAll(outputs, "Team " + to_string(current_team->getTeamNumber()) + " has been skipped.");
+            outputToAll(outputs);
+            continue;
+        }
+
+        bool a_player_skipped = false;
+        Player *current_player = current_team->getAndSetNextAlivePlayer();
+        while (current_player->isSkipping() || !current_player->canMakeAnAction()) {
+            a_player_skipped = true;
+            if (current_player->canMakeAnAction()) {
+                outputToAll(outputs, "Player " + to_string(current_player->getPlayerNumber()) + " has been skipped.");
+            } else {
+                outputToAll(outputs, "Player " + to_string(current_player->getPlayerNumber()) + " can't make any action and has been skipped.");
             }
+            current_player->hasBeenSkipped();
+            current_player = current_team->getAndSetNextAlivePlayer();
+        }
+
+        if (a_player_skipped) {
+            outputToAll(outputs);
+            for (size_t i = 0; i < teams.size(); ++i) {
+                if (i == current_team_index) {
+                    outputToAll(outputs, '>' + teams[i].getCurrentStatus());
+                } else {
+                    outputToAll(outputs, ' ' + teams[i].getStatus());
+                }
+            }
+            outputToAll(outputs);
         }
 
         // do turn
-        int player_index = teams[current_team_index].getCurrentPlayer()->getPlayerNumber() - 1;
-        outputToAll(outputs, "Waiting for player " + to_string(player_index + 1) + " from team " + to_string(teams[current_team_index].getTeamNumber()) + ".", outputs[player_index]);
+        int player_index = current_player->getPlayerNumber() - 1;
+        outputToAll(outputs, "Waiting for player " + to_string(player_index + 1) + " from team " + to_string(current_team->getTeamNumber()) + ".", outputs[player_index]);
         vector<string> actions_made;
-        for (int i = 0; i < teams[current_team_index].getCurrentPlayer()->getTurns(); ++i) {
+        for (int i = 0; i < current_player->getTurns(); ++i) {
             // player move
-            actions_made.push_back(teams[current_team_index].getCurrentPlayer()->playWith(players));
+            actions_made.push_back(current_player->playWith(players));
             // check win
             teams_alive = 0;
             for (auto &team : teams) {
