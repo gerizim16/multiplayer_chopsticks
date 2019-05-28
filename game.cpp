@@ -15,7 +15,7 @@ void runServer(string port) {
         string players_argument;
         cout << "How many players are there?" << endl;
         getline(cin, players_argument);
-        if (is_valid_int(players_argument)) {
+        if (isValidInt(players_argument)) {
             player_count = stoi(players_argument);
             if (2 <= player_count && player_count <= 6) {
                 break;
@@ -97,7 +97,7 @@ void runServer(string port) {
         outputTo(outputs[i], "Choose 1: Human || Alien || Zombie || Doggo");
 
         string type = getlineFrom(inputs[i], outputs[i]);
-        if (!is_valid_string(type, 1)) {
+        if (!isValidString(type, 1)) {
             outputTo(outputs[i], "Enter only one keyword.");
             --i;
             continue;
@@ -149,7 +149,7 @@ void runServer(string port) {
                 string group_arg;
                 outputTo(outputs[i], "Enter group number [1 to " + to_string(player_count) + "].");
                 group_arg = getlineFrom(inputs[i], outputs[i]);
-                if (is_valid_int(group_arg)) {
+                if (isValidInt(group_arg)) {
                     int group = stoi(group_arg);
                     if (1 <= group && group <= player_count) {
                         group_numbers[i] = group;
@@ -324,7 +324,7 @@ int main(int argc, char *argv[]) {
         return 0;
     }
     int port_index = argc - 1;
-    if (is_valid_int(argv[port_index])) {
+    if (isValidInt(argv[port_index])) {
         int port = stoi(argv[port_index]);
         if (!(1024 <= port && port <= 65535)) {
             cerr << "Port must be from 1024 to 65535 only." << endl;

@@ -67,7 +67,7 @@ class Hand : public Extremity {
 };
 
 void Hand::isTapped() {
-    if (count == max_count) {
+    if (count % max_count == 0) {
         alive = false;
     } else {
         count %= max_count;
@@ -361,7 +361,7 @@ string Player::playWith(vector<Player *> &all_players) {
         line >> action;
 
         if (action == "tap") {
-            if (!is_valid_string(line_string, 4)) {
+            if (!isValidString(line_string, 4)) {
                 outputTo(output, "Please enter a valid number of arguments.");
                 continue;
             }
@@ -373,7 +373,7 @@ string Player::playWith(vector<Player *> &all_players) {
                 outputTo(output, "Please enter valid attack arguments");
                 continue;
             }
-            if (is_valid_int(player_num_arg)) {
+            if (isValidInt(player_num_arg)) {
                 player_number = stoi(player_num_arg);
                 if (!(1 <= player_number && player_number <= all_players.size())) {
                     outputTo(output, "Player number out of bounds! Enter action again.");
@@ -397,7 +397,7 @@ string Player::playWith(vector<Player *> &all_players) {
         } else if (action == "disthands" || action == "distfeet") {
             int alive_hands_count = getExtremitiesCount(Extremity::HAND, true);
             int alive_feet_count = getExtremitiesCount(Extremity::FOOT, true);
-            if (!is_valid_string(line_string, (action == "disthands" ? alive_hands_count : alive_feet_count) + 1)) {
+            if (!isValidString(line_string, (action == "disthands" ? alive_hands_count : alive_feet_count) + 1)) {
                 outputTo(output, "Please enter a valid number of arguments.");
                 continue;
             }
@@ -414,7 +414,7 @@ string Player::playWith(vector<Player *> &all_players) {
                 string to_check;
                 if (extremities->at(i)->isAlive()) {
                     line >> to_check;
-                    if (!is_valid_int(to_check)) {
+                    if (!isValidInt(to_check)) {
                         is_valid = false;
                         break;
                     }

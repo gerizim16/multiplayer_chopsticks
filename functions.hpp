@@ -3,9 +3,9 @@
 #define FUNCTIONS_HPP
 
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
-#include <sstream>
 
 enum ClientActions { CLIENT_END,
                      CLIENT_OUTPUT,
@@ -33,19 +33,20 @@ std::string getlineFrom(std::istream *input, std::ostream *output) {
     return result;
 }
 
-bool is_valid_int(std::string s) {
+bool isValidInt(std::string s) {
     std::string::const_iterator it = s.begin();
     if (*it != '-' && !isdigit(*it)) return false;
+    char first_char = *(it++);
     while (it != s.end() && (isdigit(*it))) it++;
-    return !s.empty() && it == s.end();
+    return (first_char == '-' ? s.size() >= 2 : !s.empty()) && it == s.end();
 }
 
-bool is_valid_string(std::string s, int needed){
+bool isValidString(std::string s, int needed) {
     std::stringstream test(s);
     std::string word;
 
     int count = 0;
-    while (test >> word){
+    while (test >> word) {
         count++;
     }
 
